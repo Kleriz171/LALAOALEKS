@@ -90,6 +90,7 @@ async function main() {
               exerciseId: created.id,
               bodyPartId: bodyPartId,
               activationRank: muscleRelation.activationRank,
+              activationRanking: muscleRelation.activationRank,
               activationDescription: muscleRelation.explanation
             }
           });

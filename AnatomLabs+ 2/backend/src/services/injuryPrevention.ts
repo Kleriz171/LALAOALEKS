@@ -151,7 +151,7 @@ function determineRiskLevel(
 /**
  * Calculate recovery status for a muscle
  */
-export function isMuscleFully Recovered(
+export function isMuscleFullyRecovered(
   lastWorkedDate: Date,
   recoveryTimeHours: number,
   intensity: number
@@ -268,7 +268,7 @@ export function calculateCumulativeFatigue(
   let fatigueScore = 0;
   
   for (const workout of recentWorkouts) {
-    const daysAgo = getDaysS ince(workout.date);
+    const daysAgo = getDaysSince(workout.date);
     
     // Recent workouts contribute more to current fatigue
     const timeDecay = Math.exp(-0.15 * daysAgo); // Exponential decay

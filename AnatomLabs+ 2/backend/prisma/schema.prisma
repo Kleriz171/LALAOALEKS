@@ -16,28 +16,29 @@ model User {
   email     String   @unique
   password  String
   name      String
-  
+
   // Physical attributes for calculations
-  age       Int
-  gender    String   // "male" or "female"
-  weight    Float    // kg
-  height    Float    // cm
-  
+  age       Int?
+  gender    String?  // "male" or "female"
+  weight    Float?   // kg
+  height    Float?   // cm
+
   // Fitness profile
-  activityLevel     String   // "sedentary", "light", "moderate", "active", "very_active"
-  fitnessGoal       String   // "muscle_gain", "fat_loss", "endurance", "general_fitness", "sport_specific"
-  experienceLevel   String   // "beginner", "intermediate", "advanced"
-  
+  activityLevel     String?  // "sedentary", "light", "moderate", "active", "very_active"
+  fitnessGoal       String?  // "muscle_gain", "fat_loss", "endurance", "general_fitness", "sport_specific"
+  experienceLevel   String?  // "beginner", "intermediate", "advanced"
+  goal              String?  // Alias for fitnessGoal (for compatibility)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // Relations
   workoutPlans    WorkoutPlan[]
   nutritionLogs   NutritionLog[]
   activityLogs    ActivityLog[]
   reports         Report[]
   muscleUsageLogs MuscleUsageLog[]
-  
+
   @@map("users")
 }
 
@@ -54,6 +55,7 @@ model BodyPart {
   function    String   @db.Text
   importance  String   @db.Text
   movement    String?  @db.Text  // How it works during movement (for muscles)
+  anatomicalInfo Json?  // Additional anatomical information
   
   // 3D model data
   modelLayer  String   // "full_body", "muscles_bones", "skeleton_organs"
@@ -107,16 +109,17 @@ model ExerciseBodyPart {
   id            String   @id @default(uuid())
   exerciseId    String
   bodyPartId    String
-  
+
   // Activation ranking (1 = most effective, higher = less effective)
   activationRank Int
-  
+  activationRanking Int  // Alias for activationRank (for compatibility)
+
   // Activation explanation
   activationDescription String @db.Text
-  
+
   exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
   bodyPart   BodyPart @relation(fields: [bodyPartId], references: [id], onDelete: Cascade)
-  
+
   @@unique([exerciseId, bodyPartId])
   @@map("exercise_body_parts")
 }
@@ -129,54 +132,64 @@ model WorkoutPlan {
   name        String
   goal        String   // Same as User.fitnessGoal
   sport       String?  // Optional sport-specific training
-  
+
   // Schedule
   daysPerWeek Int
-  startDate   DateTime
+  startDate   DateTime @default(now())
   endDate     DateTime?
-  
+
+  // Additional fields
+  experienceLevel String?
+  description     String?
+  rationale       String?
+
   isActive    Boolean  @default(true)
-  
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   workouts    Workout[]
-  
+
   @@map("workout_plans")
 }
 
 model Workout {
   id            String   @id @default(uuid())
   workoutPlanId String
-  name          String
+  planId        String?  // Alias for workoutPlanId (for compatibility)
+  name          String?
+  dayName       String?  // Name of the day (e.g., "Push Day 1")
   dayOfWeek     Int      // 1-7 (Monday-Sunday)
   split         String   // "push", "pull", "legs", "upper", "lower", "full_body", etc.
-  
+  focus         String[] @default([])
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  
+
   workoutPlan   WorkoutPlan @relation(fields: [workoutPlanId], references: [id], onDelete: Cascade)
   exercises     WorkoutExercise[]
-  
+
   @@map("workouts")
 }
 
 model WorkoutExercise {
   id          String   @id @default(uuid())
   workoutId   String
-  exerciseId  String
+  exerciseId  String?
+  exerciseName String? // For generated workouts without DB exercises
   orderIndex  Int      // Order in the workout
-  
+
   // Prescription
   sets        Int
   reps        String   // Can be range like "8-12" or specific like "10"
   rest        Int      // Rest in seconds
   notes       String?
-  
+  targetMuscles String[] @default([])
+
   workout     Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
-  exercise    Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
-  
+  exercise    Exercise? @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
   @@map("workout_exercises")
 }
 
@@ -186,7 +199,8 @@ model Food {
   id          String   @id @default(uuid())
   name        String
   brand       String?
-  
+  category    String?  // Food category
+
   // Serving info
   servingSize Float    // in grams
   servingUnit String   // "g", "ml", "piece", etc.
@@ -222,18 +236,24 @@ model NutritionLog {
   foodId      String
   date        DateTime
   mealType    String   // "breakfast", "lunch", "dinner", "snack"
-  
+
   // Quantity consumed
   servings    Float
-  
+
+  // Calculated totals
+  totalCalories Float?
+  totalProtein  Float?
+  totalCarbs    Float?
+  totalFat      Float?
+
   // Water intake (ml) - logged separately but in same table
   waterMl     Float?
-  
+
   createdAt   DateTime @default(now())
-  
+
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   food        Food     @relation(fields: [foodId], references: [id], onDelete: Cascade)
-  
+
   @@map("nutrition_logs")
 }
 
@@ -243,19 +263,23 @@ model ActivityLog {
   id          String   @id @default(uuid())
   userId      String
   date        DateTime
-  
+
   // Activity data
-  steps       Int
-  distance    Float?   // km
+  activityType String?  // Type of activity (running, cycling, etc.)
+  duration    Int?      // Duration in minutes
+  intensity   String?   // low, moderate, high
+  steps       Int       @default(0)
+  distance    Float?    // km
   activeMinutes Int?
-  
+  notes       String?
+
   // Calculated values
   caloriesBurned Float  // Based on steps and user data
-  
+
   createdAt   DateTime @default(now())
-  
+
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   @@map("activity_logs")
 }
 
@@ -265,19 +289,24 @@ model MuscleUsageLog {
   id          String   @id @default(uuid())
   userId      String
   bodyPartId  String
+  muscleId    String?  // Alias for bodyPartId
+  muscleName  String?  // Name of the muscle
   date        DateTime
-  
+  lastWorkedDate DateTime? // When the muscle was last worked
+
   // Usage intensity (1-10 scale)
   intensity   Int
-  
+  workoutFrequency Int @default(0) // Times per week
+
   // Recovery status
   isRecovered Boolean  @default(false)
-  
+  recoveryTimeHours Int @default(48) // Required recovery time
+
   createdAt   DateTime @default(now())
-  
+
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   bodyPart    BodyPart @relation(fields: [bodyPartId], references: [id], onDelete: Cascade)
-  
+
   @@map("muscle_usage_logs")
 }
 
@@ -286,19 +315,26 @@ model MuscleUsageLog {
 model Report {
   id          String   @id @default(uuid())
   userId      String
-  type        String   // "daily", "weekly", "monthly"
-  startDate   DateTime
-  endDate     DateTime
-  
+  type        String   // "daily", "weekly", "monthly", "injury_risk"
+  title       String?  // Report title
+  startDate   DateTime?
+  endDate     DateTime?
+
+  // Report content
+  content     Json?    // Report data as JSON
+  riskLevel   String?  // For injury risk reports
+  recommendations String[] @default([])
+
   // Calculated metrics (stored as JSON for flexibility)
-  nutritionData    Json  // Calories, macros, micros averages
-  trainingData     Json  // Workout frequency, volume
-  recoveryData     Json  // Overuse warnings, rest days
-  activityData     Json  // Steps, active time
-  
+  nutritionData    Json?  // Calories, macros, micros averages
+  trainingData     Json?  // Workout frequency, volume
+  recoveryData     Json?  // Overuse warnings, rest days
+  activityData     Json?  // Steps, active time
+
+  createdAt   DateTime @default(now())
   generatedAt DateTime @default(now())
-  
+
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   @@map("reports")
 }
