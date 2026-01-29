@@ -93,12 +93,12 @@ export default function WorkoutsScreen() {
               style={styles.planCard}
               onPress={() => setSelectedPlan(plan)}
             >
-              <Text style={styles.planName}>{plan.name}</Text>
+              <Text style={styles.planName}>{plan.name || 'Workout Plan'}</Text>
               <Text style={styles.planDetails}>
-                {plan.frequency} days/week • {plan.split}
+                {plan.daysPerWeek || plan.frequency || 0} days/week
               </Text>
               <Text style={styles.planGoal}>
-                Goal: {plan.goal.replace('_', ' ')}
+                Goal: {(plan.goal || 'general').replace('_', ' ')}
               </Text>
             </TouchableOpacity>
           ))}
@@ -107,7 +107,7 @@ export default function WorkoutsScreen() {
 
       {/* Generator Modal */}
       <Modal
-        visible={Boolean(showGenerator)}
+        visible={showGenerator}
         animationType="slide"
         onRequestClose={() => setShowGenerator(false)}
       >
@@ -181,7 +181,7 @@ export default function WorkoutsScreen() {
             <TouchableOpacity
               style={[styles.submitButton, isGenerating && styles.submitButtonDisabled]}
               onPress={generateWorkout}
-              disabled={Boolean(isGenerating)}
+              disabled={isGenerating}
             >
               {isGenerating ? (
                 <ActivityIndicator color="#fff" />
@@ -195,7 +195,7 @@ export default function WorkoutsScreen() {
 
       {/* Plan Detail Modal */}
       <Modal
-        visible={Boolean(selectedPlan)}
+        visible={!!selectedPlan}
         animationType="slide"
         onRequestClose={() => setSelectedPlan(null)}
       >
@@ -208,28 +208,27 @@ export default function WorkoutsScreen() {
           </View>
 
           <ScrollView style={styles.detailContainer}>
-            {selectedPlan?.workouts.map((workout, index) => (
+            {selectedPlan?.workouts?.map((workout: any, index: number) => (
               <View key={index} style={styles.workoutDay}>
                 <Text style={styles.workoutDayTitle}>
-                  Day {workout.day}: {workout.name}
+                  Day {workout.dayOfWeek || workout.day || index + 1}: {workout.dayName || workout.name || 'Workout'}
                 </Text>
                 <Text style={styles.workoutFocus}>
-                  Focus: {workout.focus.join(', ')}
-                </Text>
-                <Text style={styles.workoutDuration}>
-                  Duration: ~{workout.estimatedDuration} min
+                  Focus: {workout.focus || workout.split || 'Full Body'}
                 </Text>
 
-                {workout.exercises.map((exercise, exIndex) => (
+                {workout.exercises?.map((exercise: any, exIndex: number) => (
                   <View key={exIndex} style={styles.exerciseItem}>
-                    <Text style={styles.exerciseName}>{exercise.name}</Text>
+                    <Text style={styles.exerciseName}>{exercise.exerciseName || exercise.name}</Text>
                     <Text style={styles.exerciseDetails}>
                       {exercise.sets} sets × {exercise.reps} reps
                       {exercise.rest && ` • ${exercise.rest}s rest`}
                     </Text>
-                    <Text style={styles.exerciseDifficulty}>
-                      {exercise.difficulty} • {exercise.equipment.join(', ')}
-                    </Text>
+                    {exercise.targetMuscles && (
+                      <Text style={styles.exerciseDifficulty}>
+                        Targets: {Array.isArray(exercise.targetMuscles) ? exercise.targetMuscles.join(', ') : exercise.targetMuscles}
+                      </Text>
+                    )}
                   </View>
                 ))}
               </View>

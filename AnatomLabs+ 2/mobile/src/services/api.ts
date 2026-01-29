@@ -21,22 +21,15 @@ import {
 // Find it using: ipconfig (Windows) or ifconfig (Mac/Linux)
 
 // Configuration: Update your IP here
-const YOUR_IP = '192.168.15.36';
+const YOUR_IP = '172.20.10.3';
 
 // Automatic URL selection based on platform
 import { Platform } from 'react-native';
 
 const getApiUrl = () => {
   if (__DEV__) {
-    // Development mode
-    if (Platform.OS === 'ios') {
-      // iOS Simulator can use localhost
-      return 'http://localhost:3001/api';
-    } else if (Platform.OS === 'android') {
-      // Android Emulator special IP
-      return 'http://10.0.2.2:3001/api';
-    }
-    // Physical device
+    // Development mode - use your Mac's IP for physical devices
+    // Change to 'http://localhost:3001/api' if using iOS Simulator only
     return `http://${YOUR_IP}:3001/api`;
   }
   // Production mode
@@ -109,25 +102,21 @@ class ApiService {
 
   // Authentication
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await this.api.post<ApiResponse<AuthResponse>>(
-      '/auth/login',
-      credentials
-    );
-    const { token, user } = response.data.data;
+    const response = await this.api.post('/auth/login', credentials);
+    // Backend returns { message, user, token } directly (not wrapped in data)
+    const { token, user } = response.data;
     await AsyncStorage.setItem('auth_token', token);
     await AsyncStorage.setItem('user_data', JSON.stringify(user));
-    return response.data.data;
+    return { token, user };
   }
 
   async register(data: RegisterData): Promise<AuthResponse> {
-    const response = await this.api.post<ApiResponse<AuthResponse>>(
-      '/auth/register',
-      data
-    );
-    const { token, user } = response.data.data;
+    const response = await this.api.post('/auth/register', data);
+    // Backend returns { message, user, token } directly (not wrapped in data)
+    const { token, user } = response.data;
     await AsyncStorage.setItem('auth_token', token);
     await AsyncStorage.setItem('user_data', JSON.stringify(user));
-    return response.data.data;
+    return { token, user };
   }
 
   async logout(): Promise<void> {
@@ -146,7 +135,8 @@ class ApiService {
 
   async isAuthenticated(): Promise<boolean> {
     const token = await AsyncStorage.getItem('auth_token');
-    return !!token;
+    // Explicitly return boolean (not string) for Fabric compatibility
+    return token !== null && token !== undefined && token !== '';
   }
 
   // Body Parts & Anatomy
@@ -164,12 +154,12 @@ class ApiService {
   }
 
   async getMuscles(): Promise<any[]> {
-    const response = await this.api.get<ApiResponse<any[]>>('/muscles');
+    const response = await this.api.get<ApiResponse<any[]>>('/body-parts');
     return response.data.data;
   }
 
   async getMuscle(id: string): Promise<any> {
-    const response = await this.api.get<ApiResponse<any>>(`/muscles/${id}`);
+    const response = await this.api.get<ApiResponse<any>>(`/body-parts/${id}`);
     return response.data.data;
   }
 
@@ -189,21 +179,26 @@ class ApiService {
 
   // Workouts
   async generateWorkout(request: GenerateWorkoutRequest): Promise<WorkoutPlan> {
-    const response = await this.api.post<ApiResponse<WorkoutPlan>>(
-      '/workouts/generate',
-      request
-    );
-    return response.data.data;
+    // Backend expects daysPerWeek, not frequency
+    const backendRequest = {
+      goal: request.goal,
+      experienceLevel: request.experienceLevel,
+      daysPerWeek: request.frequency,
+      sport: request.sport,
+    };
+    const response = await this.api.post('/workouts/generate', backendRequest);
+    // Backend returns { message, plan } directly
+    return response.data.plan;
   }
 
   async getWorkoutPlans(): Promise<WorkoutPlan[]> {
-    const response = await this.api.get<ApiResponse<WorkoutPlan[]>>('/workouts');
-    return response.data.data;
+    const response = await this.api.get('/workouts/plans');
+    return response.data || [];
   }
 
   async getWorkoutPlan(id: string): Promise<WorkoutPlan> {
-    const response = await this.api.get<ApiResponse<WorkoutPlan>>(`/workouts/${id}`);
-    return response.data.data;
+    const response = await this.api.get(`/workouts/plans/${id}`);
+    return response.data;
   }
 
   async logWorkout(workoutId: string, exercises: any[]): Promise<void> {
@@ -216,15 +211,15 @@ class ApiService {
 
   // Nutrition
   async calculateNutrition(): Promise<NutritionPlan> {
-    const response = await this.api.post<ApiResponse<NutritionPlan>>(
-      '/nutrition/calculate'
-    );
-    return response.data.data;
+    const response = await this.api.post('/nutrition/calculate');
+    // Backend returns the plan directly
+    return response.data;
   }
 
   async getNutritionPlan(): Promise<NutritionPlan> {
-    const response = await this.api.get<ApiResponse<NutritionPlan>>('/nutrition');
-    return response.data.data;
+    // Backend doesn't have a GET /nutrition endpoint, so we calculate
+    const response = await this.api.post('/nutrition/calculate');
+    return response.data;
   }
 
   async logFood(foodData: {
@@ -263,26 +258,72 @@ class ApiService {
 
   // Reports
   async getDailyReport(date?: string): Promise<DailyReport> {
-    const params = date ? { date } : {};
-    const response = await this.api.get<ApiResponse<DailyReport>>(
-      '/reports/daily',
-      { params }
-    );
-    return response.data.data;
+    // Backend doesn't have a daily report endpoint, so we construct one from available data
+    try {
+      const [nutrition, activity] = await Promise.all([
+        this.calculateNutrition().catch(() => null),
+        this.getActivityLog(date).catch(() => null),
+      ]);
+
+      // Return a constructed daily report
+      return {
+        date: date || new Date().toISOString().split('T')[0],
+        nutrition: {
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          targetCalories: nutrition?.targetCalories || 2000,
+          targetProtein: nutrition?.macros?.protein || 150,
+          targetCarbs: nutrition?.macros?.carbs || 250,
+          targetFat: nutrition?.macros?.fat || 65,
+          adherence: 0,
+        },
+        activity: {
+          steps: activity?.steps || 0,
+          caloriesBurned: activity?.caloriesBurned || 0,
+          waterIntake: activity?.waterIntake || 0,
+          sleepHours: activity?.sleepHours || 0,
+        },
+        training: {
+          workoutsCompleted: 0,
+          totalVolume: 0,
+          musclesTrained: [],
+        },
+        injuryRisk: {
+          overallRisk: 'low',
+          musclesAtRisk: [],
+          recommendations: [],
+          needsRestDay: false,
+        },
+      } as DailyReport;
+    } catch (error) {
+      throw error;
+    }
   }
 
   async getWeeklyReport(weekStart?: string): Promise<WeeklyReport> {
-    const params = weekStart ? { weekStart } : {};
-    const response = await this.api.get<ApiResponse<WeeklyReport>>(
-      '/reports/weekly',
-      { params }
-    );
-    return response.data.data;
+    // Construct weekly report from daily data
+    const daily = await this.getDailyReport();
+    return {
+      ...daily,
+      weekStart: weekStart || new Date().toISOString().split('T')[0],
+      weekEnd: new Date().toISOString().split('T')[0],
+      averageAdherence: 0,
+      totalWorkouts: 0,
+      progressIndicators: {},
+    } as WeeklyReport;
   }
 
   async getInjuryRisk(): Promise<any> {
-    const response = await this.api.get<ApiResponse<any>>('/injury-prevention');
-    return response.data.data;
+    // Backend uses POST /reports/injury-risk
+    const response = await this.api.post('/reports/injury-risk');
+    return response.data.assessment || {
+      overallRisk: 'low',
+      musclesAtRisk: [],
+      recommendations: ['Start tracking your workouts to get injury risk assessments'],
+      needsRestDay: false,
+    };
   }
 }
 

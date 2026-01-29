@@ -83,7 +83,7 @@ export default function NutritionScreen() {
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={Boolean(isRefreshing)} onRefresh={onRefresh} />
+        <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
       }
     >
       <View style={styles.header}>
@@ -114,12 +114,12 @@ export default function NutritionScreen() {
 
         <View style={[styles.calorieCard, styles.targetCard]}>
           <Text style={[styles.calorieValue, styles.targetValue]}>
-            {Math.round(nutritionPlan.targetCalories)}
+            {Math.round(nutritionPlan.targetCalories || 0)}
           </Text>
           <Text style={styles.calorieLabel}>TARGET</Text>
           <Text style={styles.calorieSubtext}>Daily Goal</Text>
           <Text style={styles.calorieDesc}>
-            Based on your goal: {nutritionPlan.goal.replace('_', ' ')}
+            Based on your goal: {(nutritionPlan.goal || 'maintenance').replace('_', ' ')}
           </Text>
         </View>
       </View>

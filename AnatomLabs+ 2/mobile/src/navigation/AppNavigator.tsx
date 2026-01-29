@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../context/AuthContext';
 import LoginScreen from '../screens/auth/LoginScreen';
+import RegisterScreen from '../screens/auth/RegisterScreen';
 import HomeScreen from '../screens/tabs/HomeScreen';
 import BodyExplorerScreen from '../screens/tabs/BodyExplorerScreen';
 import NutritionScreen from '../screens/tabs/NutritionScreen';
@@ -75,7 +76,11 @@ function TabNavigator() {
 }
 
 export default function AppNavigator() {
-  // Temporarily simplified for debugging
+  const { isAuthenticated } = useAuth();
+
+  // Ensure strict boolean for Fabric renderer compatibility
+  const isLoggedIn = isAuthenticated === true;
+
   return (
     <NavigationContainer>
       <Stack.Navigator
@@ -83,7 +88,14 @@ export default function AppNavigator() {
           headerShown: false
         }}
       >
-        <Stack.Screen name="Login" component={LoginScreen} />
+        {isLoggedIn ? (
+          <Stack.Screen name="Main" component={TabNavigator} />
+        ) : (
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Register" component={RegisterScreen} />
+          </>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );

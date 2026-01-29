@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import {
   View,
   Text,
@@ -7,16 +7,48 @@ import {
   ScrollView,
   Modal,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
-import BodyViewer3DAdvanced from '../../components/BodyViewer3DAdvanced';
 import api from '../../services/api';
 
+// Fallback component for 3D loading/errors
+function Viewer3DFallback() {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0a0a' }}>
+      <ActivityIndicator size="large" color="#e74c3c" />
+      <Text style={{ color: '#888', marginTop: 16 }}>Loading 3D Viewer...</Text>
+    </View>
+  );
+}
+
+// Placeholder for 3D view - disabled due to Fabric compatibility issues
+function BodyViewer3DPlaceholder({ onSwitchToList }: { onSwitchToList: () => void }) {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0a0a', padding: 20 }}>
+      <Text style={{ color: '#e74c3c', fontSize: 20, fontWeight: 'bold', marginBottom: 12 }}>
+        3D View Unavailable
+      </Text>
+      <Text style={{ color: '#888', fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 20 }}>
+        3D rendering is temporarily disabled due to compatibility issues with React Native's new architecture.
+      </Text>
+      <TouchableOpacity
+        style={{ backgroundColor: '#e74c3c', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }}
+        onPress={onSwitchToList}
+      >
+        <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Use List View</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function BodyExplorerScreen() {
-  const [viewMode, setViewMode] = useState<'3d' | 'list'>('3d');
+  // Default to list view to avoid 3D crash issues on simulator
+  const [viewMode, setViewMode] = useState<'3d' | 'list'>('list');
   const [muscles, setMuscles] = useState<any[]>([]);
   const [selectedMuscle, setSelectedMuscle] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showDetail, setShowDetail] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadMuscles();
@@ -25,9 +57,10 @@ export default function BodyExplorerScreen() {
   const loadMuscles = async () => {
     try {
       setIsLoading(true);
+      setError(null);
       const data = await api.getMuscles();
       // Add mock positions for 3D view
-      const musclesWithPositions = data.map((muscle: any, index: number) => ({
+      const musclesWithPositions = (data || []).map((muscle: any, index: number) => ({
         ...muscle,
         position_x: Math.sin(index) * 3,
         position_y: 3 + Math.cos(index * 0.5) * 2,
@@ -35,8 +68,9 @@ export default function BodyExplorerScreen() {
         layer: 1,
       }));
       setMuscles(musclesWithPositions);
-    } catch (error) {
-      console.error('Failed to load muscles:', error);
+    } catch (err: any) {
+      console.error('Failed to load muscles:', err);
+      setError(err?.message || 'Failed to load anatomy data. Make sure the backend server is running.');
     } finally {
       setIsLoading(false);
     }
@@ -58,6 +92,21 @@ export default function BodyExplorerScreen() {
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#e74c3c" />
         <Text style={styles.loadingText}>Loading anatomy data...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={[styles.loadingText, { color: '#e74c3c', marginBottom: 16 }]}>Error</Text>
+        <Text style={[styles.loadingText, { textAlign: 'center', paddingHorizontal: 20 }]}>{error}</Text>
+        <TouchableOpacity
+          style={{ backgroundColor: '#e74c3c', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8, marginTop: 20 }}
+          onPress={loadMuscles}
+        >
+          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -87,11 +136,7 @@ export default function BodyExplorerScreen() {
       </View>
 
       {viewMode === '3d' ? (
-        <BodyViewer3DAdvanced
-          muscles={muscles}
-          onMusclePress={handleMusclePress}
-          layer={1}
-        />
+        <BodyViewer3DPlaceholder onSwitchToList={() => setViewMode('list')} />
       ) : (
         <ScrollView style={styles.listContainer}>
           {muscles.map((muscle) => (
@@ -110,7 +155,7 @@ export default function BodyExplorerScreen() {
       )}
 
       <Modal
-        visible={Boolean(showDetail)}
+        visible={showDetail}
         animationType="slide"
         onRequestClose={() => setShowDetail(false)}
       >

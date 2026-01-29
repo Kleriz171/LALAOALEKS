@@ -315,6 +315,7 @@ async function main() {
       height: 180,
       activityLevel: 'moderate',
       fitnessGoal: 'muscle_gain',
+      goal: 'muscle_gain',
       experienceLevel: 'intermediate'
     }
   });

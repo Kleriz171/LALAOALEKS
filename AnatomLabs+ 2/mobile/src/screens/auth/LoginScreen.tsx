@@ -12,7 +12,11 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 
-export default function LoginScreen() {
+interface Props {
+  navigation: any;
+}
+
+export default function LoginScreen({ navigation }: Props) {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -59,7 +63,7 @@ export default function LoginScreen() {
             onChangeText={setEmail}
             autoCapitalize="none"
             keyboardType="email-address"
-            editable={Boolean(!isLoading)}
+            editable={!isLoading}
           />
 
           <TextInput
@@ -69,13 +73,13 @@ export default function LoginScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry={true}
-            editable={Boolean(!isLoading)}
+            editable={!isLoading}
           />
 
           <TouchableOpacity
             style={[styles.button, isLoading && styles.buttonDisabled]}
             onPress={handleLogin}
-            disabled={Boolean(isLoading)}
+            disabled={isLoading}
           >
             {isLoading ? (
               <ActivityIndicator color="#fff" />
@@ -87,11 +91,20 @@ export default function LoginScreen() {
           <TouchableOpacity
             style={styles.demoButton}
             onPress={useDemoAccount}
-            disabled={Boolean(isLoading)}
+            disabled={isLoading}
           >
             <Text style={styles.demoButtonText}>Use Demo Account</Text>
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          style={styles.registerLink}
+          onPress={() => navigation.navigate('Register')}
+        >
+          <Text style={styles.registerLinkText}>
+            Don't have an account? <Text style={styles.registerLinkBold}>Sign Up</Text>
+          </Text>
+        </TouchableOpacity>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Educational Platform</Text>
@@ -177,5 +190,17 @@ const styles = StyleSheet.create({
   footerSubtext: {
     color: '#444',
     fontSize: 12,
+  },
+  registerLink: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  registerLinkText: {
+    color: '#888',
+    fontSize: 14,
+  },
+  registerLinkBold: {
+    color: '#e74c3c',
+    fontWeight: '600',
   },
 });

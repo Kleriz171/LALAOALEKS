@@ -1,9 +1,9 @@
 /**
  * AI Recommendations Service (STRICTLY LIMITED USE)
- * 
+ *
  * This is the ONLY place where AI is used in the application.
  * Use case: Advanced calorie intake recommendations
- * 
+ *
  * Requirements:
  * 1. Must provide reasoning for every recommendation
  * 2. Must reference user data in explanation
@@ -11,11 +11,8 @@
  * 4. NO AI for workout generation or anatomy explanations
  */
 
-import OpenAI from 'openai';
-
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-}) : null;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
 export interface UserContext {
   age: number;
@@ -48,7 +45,7 @@ export interface AICalorieRecommendation {
 
 /**
  * Generate AI-powered calorie recommendation (WITH FULL TRANSPARENCY)
- * 
+ *
  * This function uses AI but maintains full explainability:
  * - Shows reasoning step-by-step
  * - References all user data used
@@ -58,43 +55,70 @@ export interface AICalorieRecommendation {
 export async function getAICalorieRecommendation(
   userContext: UserContext
 ): Promise<AICalorieRecommendation> {
-  
-  // Fallback if OpenAI is not configured
-  if (!openai || !process.env.OPENAI_API_KEY) {
+
+  // Fallback if Gemini is not configured
+  if (!GEMINI_API_KEY) {
     return getFallbackRecommendation(userContext);
   }
 
   try {
     const prompt = buildPrompt(userContext);
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a nutrition science expert. Provide calorie recommendations based on user data.
+    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: `You are a nutrition science expert. Provide calorie recommendations based on user data.
 IMPORTANT: You MUST provide:
 1. Clear reasoning for your recommendation
 2. Reference to specific user data points
 3. Confidence level based on data completeness
 4. Alternative approaches
 
-Format your response as JSON with these fields:
+Respond ONLY with valid JSON (no markdown, no code blocks) with these fields:
 - recommendedCalories: number
 - reasoning: array of strings (each step of your logic)
 - confidence: "low" | "medium" | "high"
-- alternatives: array of strings (other approaches to consider)`
-        },
-        {
-          role: 'user',
-          content: prompt
+- alternatives: array of strings (other approaches to consider)
+
+User data:
+${prompt}`
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.3,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 1024,
         }
-      ],
-      temperature: 0.3, // Lower temperature for more consistent, factual responses
-      response_format: { type: 'json_object' }
+      })
     });
 
-    const aiResponse = JSON.parse(completion.choices[0].message.content || '{}');
+    if (!response.ok) {
+      console.error('Gemini API error:', response.status, response.statusText);
+      return getFallbackRecommendation(userContext);
+    }
+
+    const data = await response.json();
+    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    // Parse JSON from response (handle potential markdown code blocks)
+    let jsonStr = textResponse.trim();
+    if (jsonStr.startsWith('```json')) {
+      jsonStr = jsonStr.slice(7);
+    }
+    if (jsonStr.startsWith('```')) {
+      jsonStr = jsonStr.slice(3);
+    }
+    if (jsonStr.endsWith('```')) {
+      jsonStr = jsonStr.slice(0, -3);
+    }
+
+    const aiResponse = JSON.parse(jsonStr.trim());
 
     // Construct transparent recommendation
     return {
@@ -180,12 +204,12 @@ function getFallbackRecommendation(context: UserContext): AICalorieRecommendatio
 
   // Consider energy levels
   if (context.energyLevels === 'low') {
-    reasoning.push('⚠️ Low energy levels reported - may need more calories or carbohydrates');
+    reasoning.push('Low energy levels reported - may need more calories or carbohydrates');
   }
 
   // Consider sleep
   if (context.sleepQuality === 'poor') {
-    reasoning.push('⚠️ Poor sleep quality can affect recovery - ensure adequate nutrition');
+    reasoning.push('Poor sleep quality can affect recovery - ensure adequate nutrition');
   }
 
   return {
@@ -250,13 +274,13 @@ export function validateRecommendation(
 
 /**
  * IMPORTANT: This is the ONLY file where AI is used
- * 
+ *
  * AI is NOT used for:
  * - Workout generation (see workoutGenerator.ts - pure rule-based logic)
  * - Anatomy explanations (see sample-data - pre-written educational content)
  * - Exercise selection (see workoutGenerator.ts - algorithm-based)
  * - Injury detection (see injuryPrevention.ts - pattern recognition algorithms)
  * - BMR/TDEE calculations (see nutritionCalculator.ts - validated formulas)
- * 
+ *
  * This maintains scientific integrity and judge transparency.
  */

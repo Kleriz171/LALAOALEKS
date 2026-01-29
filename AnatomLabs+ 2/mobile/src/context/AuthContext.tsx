@@ -39,13 +39,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const checkAuth = async () => {
     try {
       const isAuth = await api.isAuthenticated();
-      if (isAuth) {
+      if (isAuth === true) {
         const userData = await api.getCurrentUser();
         setUser(userData);
         setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
+      setIsAuthenticated(false);
     } finally {
       setIsLoading(false);
     }
