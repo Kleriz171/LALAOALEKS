@@ -1,0 +1,494 @@
+// Prisma schema for Human Performance Science Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========== USER MANAGEMENT ==========
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+
+  // Physical attributes for calculations
+  age       Int?
+  gender    String?  // "male" or "female"
+  weight    Float?   // kg
+  height    Float?   // cm
+
+  // Fitness profile
+  activityLevel     String?  // "sedentary", "light", "moderate", "active", "very_active"
+  fitnessGoal       String?  // "muscle_gain", "fat_loss", "endurance", "general_fitness", "sport_specific"
+  experienceLevel   String?  // "beginner", "intermediate", "advanced"
+  goal              String?  // Alias for fitnessGoal (for compatibility)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  workoutPlans    WorkoutPlan[]
+  nutritionLogs   NutritionLog[]
+  activityLogs    ActivityLog[]
+  reports         Report[]
+  muscleUsageLogs MuscleUsageLog[]
+  weightLogs      WeightLog[]
+  mealPresets     MealPreset[]
+  streak          UserStreak?
+  workoutSessions WorkoutSession[]
+
+  @@map("users")
+}
+
+// ========== ANATOMY & BODY PARTS ==========
+
+model BodyPart {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  type        String   // "muscle", "organ", "bone"
+  category    String   // "upper_body", "lower_body", "core", "cardiovascular", "skeletal"
+  
+  // Educational content
+  description String   @db.Text
+  function    String   @db.Text
+  importance  String   @db.Text
+  movement    String?  @db.Text  // How it works during movement (for muscles)
+  anatomicalInfo Json?  // Additional anatomical information
+  
+  // 3D model data
+  modelLayer  String   // "full_body", "muscles_bones", "skeleton_organs"
+  position3D  Json     // {x, y, z} coordinates for highlighting
+  
+  // Recovery time (for muscles only, in hours)
+  recoveryTime Int?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  exercises       ExerciseBodyPart[]
+  muscleUsageLogs MuscleUsageLog[]
+  
+  @@map("body_parts")
+}
+
+// ========== EXERCISES ==========
+
+model Exercise {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  category    String   // "strength", "cardio", "flexibility", "sport_specific"
+  difficulty  String   // "beginner", "intermediate", "advanced"
+  equipment   String   // "none", "dumbbells", "barbell", "machine", "resistance_band", etc.
+  
+  // Exercise details
+  description String   @db.Text
+  instructions String  @db.Text
+  
+  // Sport-specific tags
+  sportTags   String[] // ["football", "basketball", "general", etc.]
+  
+  // Biomechanics explanation
+  mechanicalLoad  String   @db.Text  // Explanation of forces and load
+  jointInvolvement String  @db.Text  // Which joints are involved
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  bodyParts   ExerciseBodyPart[]
+  workoutExercises WorkoutExercise[]
+  
+  @@map("exercises")
+}
+
+// Junction table for Exercise-BodyPart relationship with activation ranking
+model ExerciseBodyPart {
+  id            String   @id @default(uuid())
+  exerciseId    String
+  bodyPartId    String
+
+  // Activation ranking (1 = most effective, higher = less effective)
+  activationRank Int
+  activationRanking Int  // Alias for activationRank (for compatibility)
+
+  // Activation explanation
+  activationDescription String @db.Text
+
+  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  bodyPart   BodyPart @relation(fields: [bodyPartId], references: [id], onDelete: Cascade)
+
+  @@unique([exerciseId, bodyPartId])
+  @@map("exercise_body_parts")
+}
+
+// ========== WORKOUT SYSTEM ==========
+
+model WorkoutPlan {
+  id          String   @id @default(uuid())
+  userId      String
+  name        String
+  goal        String   // Same as User.fitnessGoal
+  sport       String?  // Optional sport-specific training
+
+  // Schedule
+  daysPerWeek Int
+  startDate   DateTime @default(now())
+  endDate     DateTime?
+
+  // Additional fields
+  experienceLevel String?
+  description     String?
+  rationale       String?
+
+  isActive    Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workouts    Workout[]
+
+  @@map("workout_plans")
+}
+
+model Workout {
+  id            String   @id @default(uuid())
+  workoutPlanId String
+  planId        String?  // Alias for workoutPlanId (for compatibility)
+  name          String?
+  dayName       String?  // Name of the day (e.g., "Push Day 1")
+  dayOfWeek     Int      // 1-7 (Monday-Sunday)
+  split         String   // "push", "pull", "legs", "upper", "lower", "full_body", etc.
+  focus         String[] @default([])
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workoutPlan   WorkoutPlan @relation(fields: [workoutPlanId], references: [id], onDelete: Cascade)
+  exercises     WorkoutExercise[]
+
+  @@map("workouts")
+}
+
+model WorkoutExercise {
+  id          String   @id @default(uuid())
+  workoutId   String
+  exerciseId  String?
+  exerciseName String? // For generated workouts without DB exercises
+  orderIndex  Int      // Order in the workout
+
+  // Prescription
+  sets        Int
+  reps        String   // Can be range like "8-12" or specific like "10"
+  rest        Int      // Rest in seconds
+  notes       String?
+  targetMuscles String[] @default([])
+
+  workout     Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise    Exercise? @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@map("workout_exercises")
+}
+
+// ========== NUTRITION SYSTEM ==========
+
+model Food {
+  id          String   @id @default(uuid())
+  name        String
+  brand       String?
+  category    String?  // Food category
+  barcode     String?  // For barcode scanning
+
+  // Serving info
+  servingSize Float    // in grams
+  servingUnit String   // "g", "ml", "piece", etc.
+
+  // Macros (per serving)
+  calories    Float
+  protein     Float    // g
+  carbs       Float    // g
+  fat         Float    // g
+  fiber       Float?   // g
+  sugar       Float?   // g
+
+  // ========== ELECTROLYTES (mg) ==========
+  sodium      Float?   // Key electrolyte - nerve/muscle function
+  potassium   Float?   // Key electrolyte - heart/muscle function
+  chloride    Float?   // Key electrolyte - fluid balance
+
+  // ========== MACROMINERALS (mg) ==========
+  calcium     Float?   // Bones, muscle contraction
+  magnesium   Float?   // 300+ enzymatic reactions, muscle/nerve
+  phosphorus  Float?   // Bones, energy production (ATP)
+
+  // ========== TRACE MINERALS (mg) ==========
+  iron        Float?   // Oxygen transport, energy
+  zinc        Float?   // Immune function, protein synthesis
+  copper      Float?   // Iron metabolism, connective tissue
+  manganese   Float?   // Bone formation, metabolism
+  selenium    Float?   // Antioxidant, thyroid function (mcg)
+  iodine      Float?   // Thyroid function (mcg)
+  chromium    Float?   // Glucose metabolism (mcg)
+
+  // ========== FAT-SOLUBLE VITAMINS ==========
+  vitaminA    Float?   // Vision, immune (mcg RAE)
+  vitaminD    Float?   // Bone health, immune (mcg)
+  vitaminE    Float?   // Antioxidant (mg)
+  vitaminK    Float?   // Blood clotting, bones (mcg)
+
+  // ========== WATER-SOLUBLE VITAMINS ==========
+  vitaminC    Float?   // Immune, collagen (mg)
+  vitaminB1   Float?   // Thiamin - energy metabolism (mg)
+  vitaminB2   Float?   // Riboflavin - energy, cell function (mg)
+  vitaminB3   Float?   // Niacin - energy, DNA repair (mg)
+  vitaminB5   Float?   // Pantothenic acid - energy (mg)
+  vitaminB6   Float?   // Protein metabolism, brain (mg)
+  vitaminB7   Float?   // Biotin - metabolism (mcg)
+  vitaminB9   Float?   // Folate - cell division (mcg DFE)
+  vitaminB12  Float?   // Nerve function, blood (mcg)
+
+  // ========== OTHER NUTRIENTS ==========
+  cholesterol Float?   // mg
+  omega3      Float?   // g - EPA/DHA combined
+  omega6      Float?   // g
+  transFat    Float?   // g
+  saturatedFat Float?  // g
+  caffeine    Float?   // mg
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  nutritionLogs   NutritionLog[]
+  mealPresetItems MealPresetItem[]
+
+  @@map("foods")
+}
+
+model NutritionLog {
+  id          String   @id @default(uuid())
+  userId      String
+  foodId      String
+  date        DateTime
+  mealType    String   // "breakfast", "lunch", "dinner", "snack"
+
+  // Quantity consumed
+  servings    Float
+
+  // Calculated totals - Macros
+  totalCalories Float?
+  totalProtein  Float?
+  totalCarbs    Float?
+  totalFat      Float?
+  totalFiber    Float?
+
+  // Calculated totals - Electrolytes (mg)
+  totalSodium     Float?
+  totalPotassium  Float?
+
+  // Calculated totals - Macrominerals (mg)
+  totalCalcium    Float?
+  totalMagnesium  Float?
+  totalPhosphorus Float?
+  totalIron       Float?
+
+  // Water intake (ml) - logged separately but in same table
+  waterMl     Float?
+
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  food        Food     @relation(fields: [foodId], references: [id], onDelete: Cascade)
+
+  @@map("nutrition_logs")
+}
+
+// ========== ACTIVITY TRACKING ==========
+
+model ActivityLog {
+  id          String   @id @default(uuid())
+  userId      String
+  date        DateTime
+
+  // Activity data
+  activityType String?  // Type of activity (running, cycling, etc.)
+  duration    Int?      // Duration in minutes
+  intensity   String?   // low, moderate, high
+  steps       Int       @default(0)
+  distance    Float?    // km
+  activeMinutes Int?
+  notes       String?
+
+  // Calculated values
+  caloriesBurned Float  // Based on steps and user data
+
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("activity_logs")
+}
+
+// ========== INJURY PREVENTION ==========
+
+model MuscleUsageLog {
+  id          String   @id @default(uuid())
+  userId      String
+  bodyPartId  String
+  muscleId    String?  // Alias for bodyPartId
+  muscleName  String?  // Name of the muscle
+  date        DateTime
+  lastWorkedDate DateTime? // When the muscle was last worked
+
+  // Usage intensity (1-10 scale)
+  intensity   Int
+  workoutFrequency Int @default(0) // Times per week
+
+  // Recovery status
+  isRecovered Boolean  @default(false)
+  recoveryTimeHours Int @default(48) // Required recovery time
+
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bodyPart    BodyPart @relation(fields: [bodyPartId], references: [id], onDelete: Cascade)
+
+  @@map("muscle_usage_logs")
+}
+
+// ========== REPORTING ==========
+
+model Report {
+  id          String   @id @default(uuid())
+  userId      String
+  type        String   // "daily", "weekly", "monthly", "injury_risk"
+  title       String?  // Report title
+  startDate   DateTime?
+  endDate     DateTime?
+
+  // Report content
+  content     Json?    // Report data as JSON
+  riskLevel   String?  // For injury risk reports
+  recommendations String[] @default([])
+
+  // Calculated metrics (stored as JSON for flexibility)
+  nutritionData    Json?  // Calories, macros, micros averages
+  trainingData     Json?  // Workout frequency, volume
+  recoveryData     Json?  // Overuse warnings, rest days
+  activityData     Json?  // Steps, active time
+
+  createdAt   DateTime @default(now())
+  generatedAt DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("reports")
+}
+
+// ========== NUTRITION TRACKING EXTENSIONS ==========
+
+model WeightLog {
+  id      String   @id @default(uuid())
+  userId  String
+  weight  Float    // kg
+  date    DateTime @default(now())
+  note    String?
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("weight_logs")
+}
+
+model MealPreset {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     MealPresetItem[]
+
+  @@map("meal_presets")
+}
+
+model MealPresetItem {
+  id           String     @id @default(uuid())
+  mealPresetId String
+  foodId       String
+  servings     Float
+
+  mealPreset   MealPreset @relation(fields: [mealPresetId], references: [id], onDelete: Cascade)
+  food         Food       @relation(fields: [foodId], references: [id], onDelete: Cascade)
+
+  @@map("meal_preset_items")
+}
+
+model UserStreak {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  currentStreak   Int       @default(0)
+  longestStreak   Int       @default(0)
+  lastLoggedDate  DateTime?
+  totalDaysLogged Int       @default(0)
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_streaks")
+}
+
+// ========== WORKOUT SESSION TRACKING ==========
+
+model WorkoutSession {
+  id          String   @id @default(uuid())
+  userId      String
+  name        String
+  startedAt   DateTime
+  completedAt DateTime @default(now())
+  duration    Int      // duration in minutes
+  notes       String?
+
+  // Calculated totals
+  totalVolume Float    @default(0)  // total weight × reps
+  totalSets   Int      @default(0)
+  totalReps   Int      @default(0)
+
+  // Muscles worked (stored as JSON array)
+  musclesWorked String[] @default([])
+
+  // Optional link to workout plan
+  workoutPlanId String?
+
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercises   WorkoutSessionExercise[]
+
+  @@map("workout_sessions")
+}
+
+model WorkoutSessionExercise {
+  id               String   @id @default(uuid())
+  workoutSessionId String
+  exerciseName     String
+  muscleGroup      String
+  orderIndex       Int
+
+  // Sets data stored as JSON for flexibility
+  // Array of: { setNumber, weight, reps, isWarmup, isDropSet, completedAt }
+  setsData         Json     @default("[]")
+
+  // Calculated totals for this exercise
+  totalVolume      Float    @default(0)
+  maxWeight        Float    @default(0)
+  maxReps          Int      @default(0)
+
+  workoutSession   WorkoutSession @relation(fields: [workoutSessionId], references: [id], onDelete: Cascade)
+
+  @@map("workout_session_exercises")
+}
