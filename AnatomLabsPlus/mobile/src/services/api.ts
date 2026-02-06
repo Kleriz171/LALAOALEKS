@@ -33,6 +33,8 @@ import {
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
+const PRODUCTION_API_URL = 'https://anatomlabs-production.up.railway.app/api';
+
 const getApiUrl = () => {
   if (__DEV__) {
     const debuggerHost = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost;
@@ -42,7 +44,7 @@ const getApiUrl = () => {
     }
     return 'http://localhost:3001/api';
   }
-  return 'https://your-production-api.com/api';
+  return PRODUCTION_API_URL;
 };
 
 const API_BASE_URL = getApiUrl();
