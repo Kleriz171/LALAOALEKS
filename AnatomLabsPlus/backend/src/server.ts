@@ -25,6 +25,7 @@ import nutritionRoutes from './routes/nutrition';
 import activityRoutes from './routes/activity';
 import reportsRoutes from './routes/reports';
 import healthRoutes from './routes/health';
+import chatRoutes from './routes/chat';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3001;
@@ -50,6 +51,7 @@ app.use('/api/nutrition', nutritionRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
@@ -74,7 +76,8 @@ app.get('/', (req: Request, res: Response) => {
       nutrition: '/api/nutrition',
       activity: '/api/activity',
       reports: '/api/reports',
-      health: '/api/health'
+      health: '/api/health',
+      chat: '/api/chat'
     }
   });
 });

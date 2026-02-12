@@ -28,6 +28,17 @@ import {
   BMIResult,
   HealthConditionsResponse,
   HealthProfile,
+  TrendData,
+  TrendMetric,
+  AnalyticsSummary,
+  PeriodComparison,
+  VolumeByMuscle,
+  ExerciseProgression,
+  BiomarkerEntry,
+  HealthSummary,
+  InsightItem,
+  ShareableReport,
+  TrainingHeatmapDay,
 } from '../types';
 
 import { Platform } from 'react-native';
@@ -875,6 +886,101 @@ class ApiService {
     dietaryPreferences?: string[];
   }): Promise<any> {
     const response = await this.api.put('/users/me/health-profile', profile);
+    return response.data;
+  }
+
+  async sendChatMessage(
+    message: string,
+    character: string,
+    history: { role: string; content: string }[]
+  ): Promise<{ response: string }> {
+    const res = await this.api.post<{ success: boolean; response: string }>('/chat/send', {
+      message,
+      character,
+      history,
+    });
+    return { response: res.data.response };
+  }
+
+  async getTrends(metric: TrendMetric, days: number = 30): Promise<TrendData> {
+    const response = await this.api.get<TrendData>('/reports/analytics/trends', {
+      params: { metric, days },
+    });
+    return response.data;
+  }
+
+  async getAnalyticsSummary(period: string = 'week', startDate?: string, endDate?: string): Promise<AnalyticsSummary> {
+    const params: any = { period };
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await this.api.get<AnalyticsSummary>('/reports/analytics/summary', { params });
+    return response.data;
+  }
+
+  async getPeriodComparison(p1Start: string, p1End: string, p2Start: string, p2End: string): Promise<PeriodComparison> {
+    const response = await this.api.get<PeriodComparison>('/reports/analytics/comparisons', {
+      params: { period1Start: p1Start, period1End: p1End, period2Start: p2Start, period2End: p2End },
+    });
+    return response.data;
+  }
+
+  async getVolumeByMuscle(days: number = 30): Promise<VolumeByMuscle[]> {
+    const response = await this.api.get<VolumeByMuscle[]>('/reports/training/volume-by-muscle', {
+      params: { days },
+    });
+    return response.data;
+  }
+
+  async getExerciseProgression(exerciseName: string, days: number = 90): Promise<ExerciseProgression> {
+    const response = await this.api.get<ExerciseProgression>('/reports/training/progression', {
+      params: { exerciseName, days },
+    });
+    return response.data;
+  }
+
+  async getTrainingHeatmap(weeks: number = 12): Promise<TrainingHeatmapDay[]> {
+    const response = await this.api.get<TrainingHeatmapDay[]>('/reports/training/heatmap', {
+      params: { weeks },
+    });
+    return response.data;
+  }
+
+  async logBiomarker(data: { type: string; value: number; value2?: number; unit: string; date?: string; notes?: string; source?: string }): Promise<BiomarkerEntry> {
+    const response = await this.api.post<{ log: BiomarkerEntry }>('/reports/biomarkers', data);
+    return response.data.log;
+  }
+
+  async getBiomarkers(type?: string, days: number = 90): Promise<BiomarkerEntry[]> {
+    const params: any = { days };
+    if (type) params.type = type;
+    const response = await this.api.get<BiomarkerEntry[]>('/reports/biomarkers', { params });
+    return response.data;
+  }
+
+  async getHealthSummary(): Promise<HealthSummary> {
+    const response = await this.api.get<HealthSummary>('/reports/health-summary');
+    return response.data;
+  }
+
+  async getInsights(): Promise<InsightItem[]> {
+    const response = await this.api.get<InsightItem[]>('/reports/insights');
+    return response.data;
+  }
+
+  async generateReport(startDate: string, endDate: string, sections?: string[]): Promise<ShareableReport> {
+    const response = await this.api.post<ShareableReport>('/reports/generate', {
+      startDate,
+      endDate,
+      sections,
+    });
+    return response.data;
+  }
+
+  async shareReport(reportId: string, expiresInHours?: number): Promise<{ shareToken: string; expiresAt: string }> {
+    const response = await this.api.post<{ shareToken: string; expiresAt: string }>(
+      `/reports/${reportId}/share`,
+      { expiresInHours },
+    );
     return response.data;
   }
 }

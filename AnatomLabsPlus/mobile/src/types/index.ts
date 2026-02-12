@@ -680,6 +680,157 @@ export interface NutritionReport {
 }
 
 // ============================================
+// REPORTS ANALYTICS TYPES
+// ============================================
+
+export type ReportSegment = 'overview' | 'trends' | 'training' | 'health' | 'insights' | 'share';
+export type DateRangeMode = 'day' | 'week' | 'month';
+export type TrendMetric = 'weight' | 'calories' | 'protein' | 'volume' | 'steps';
+
+export interface ChartDataPoint {
+  date: string;
+  value: number;
+  label?: string;
+}
+
+export interface TrendData {
+  metric: TrendMetric;
+  data: ChartDataPoint[];
+  average: number;
+  min: number;
+  max: number;
+  change: number;
+  changePercent: number;
+  trend: 'up' | 'down' | 'stable';
+}
+
+export interface AnalyticsSummary {
+  period: DateRangeMode;
+  startDate: string;
+  endDate: string;
+  nutrition: {
+    avgCalories: number;
+    avgProtein: number;
+    avgCarbs: number;
+    avgFat: number;
+    adherenceScore: number;
+    daysTracked: number;
+  };
+  activity: {
+    avgSteps: number;
+    avgCaloriesBurned: number;
+    avgWaterIntake: number;
+    avgSleepHours: number;
+    totalActiveDays: number;
+  };
+  training: {
+    totalWorkouts: number;
+    totalVolume: number;
+    avgDuration: number;
+    muscleGroupDistribution: { muscle: string; sets: number; percentage: number }[];
+  };
+}
+
+export interface PeriodComparison {
+  period1: AnalyticsSummary;
+  period2: AnalyticsSummary;
+  changes: {
+    calories: number;
+    protein: number;
+    steps: number;
+    workouts: number;
+    volume: number;
+    sleepHours: number;
+  };
+}
+
+export interface VolumeByMuscle {
+  muscle: string;
+  totalSets: number;
+  totalVolume: number;
+  sessions: number;
+  lastTrained: string;
+  percentage: number;
+}
+
+export interface ExerciseProgression {
+  exerciseName: string;
+  dataPoints: {
+    date: string;
+    maxWeight: number;
+    maxReps: number;
+    totalVolume: number;
+    estimatedOneRepMax: number;
+  }[];
+  personalBest: {
+    weight: number;
+    reps: number;
+    volume: number;
+    oneRepMax: number;
+  };
+  trend: 'up' | 'down' | 'stable';
+}
+
+export interface BiomarkerEntry {
+  id: string;
+  type: string;
+  value: number;
+  value2?: number;
+  unit: string;
+  date: string;
+  notes?: string;
+  source?: string;
+}
+
+export interface HealthSummary {
+  latestBiomarkers: {
+    weight?: BiomarkerEntry;
+    bodyFat?: BiomarkerEntry;
+    bloodPressure?: BiomarkerEntry;
+    bloodGlucose?: BiomarkerEntry;
+    heartRate?: BiomarkerEntry;
+    waist?: BiomarkerEntry;
+  };
+  healthConditions: string[];
+  trends: {
+    weight: TrendData | null;
+    bodyFat: TrendData | null;
+  };
+}
+
+export interface InsightItem {
+  id: string;
+  type: 'pattern' | 'prediction' | 'correlation';
+  title: string;
+  description: string;
+  confidence: number;
+  icon: string;
+  color: string;
+  data?: any;
+  createdAt: string;
+}
+
+export interface ShareableReport {
+  id: string;
+  title: string;
+  period: string;
+  startDate: string;
+  endDate: string;
+  sections: string[];
+  content: any;
+  shareToken?: string;
+  shareUrl?: string;
+  expiresAt?: string;
+  createdAt: string;
+}
+
+export interface TrainingHeatmapDay {
+  date: string;
+  intensity: number;
+  workouts: number;
+}
+
+// ============================================
 // API Response Types
 // ============================================
 

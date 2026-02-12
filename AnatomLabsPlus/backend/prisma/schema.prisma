@@ -53,6 +53,8 @@ model User {
   mealPresets     MealPreset[]
   streak          UserStreak?
   workoutSessions WorkoutSession[]
+  biomarkerLogs   BiomarkerLog[]
+  insightCaches   InsightCache[]
 
   @@map("users")
 }
@@ -413,8 +415,57 @@ model Report {
   generatedAt DateTime @default(now())
 
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shares      ReportShare[]
 
   @@map("reports")
+}
+
+model BiomarkerLog {
+  id      String   @id @default(uuid())
+  userId  String
+  type    String
+  value   Float
+  value2  Float?
+  unit    String
+  date    DateTime @default(now())
+  notes   String?
+  source  String?
+
+  createdAt DateTime @default(now())
+
+  user    User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, date])
+  @@map("biomarker_logs")
+}
+
+model ReportShare {
+  id          String    @id @default(uuid())
+  reportId    String
+  shareToken  String    @unique
+  expiresAt   DateTime?
+  accessCount Int       @default(0)
+
+  createdAt   DateTime  @default(now())
+
+  report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@map("report_shares")
+}
+
+model InsightCache {
+  id         String   @id @default(uuid())
+  userId     String
+  type       String
+  data       Json
+  validUntil DateTime
+
+  createdAt  DateTime @default(now())
+
+  user       User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@map("insight_caches")
 }
 
 // ========== NUTRITION TRACKING EXTENSIONS ==========
