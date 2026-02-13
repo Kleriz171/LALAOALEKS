@@ -229,8 +229,21 @@ export default function AdminUsersSegment() {
     );
   };
 
+  const totalCount = users.length > 0 ? `${users.length}${page < totalPages ? '+' : ''} users` : '';
+
   return (
     <View>
+      {totalCount !== '' && (
+        <View style={styles.countHeader}>
+          <Ionicons name="people" size={16} color={COLORS.primary} />
+          <Text style={styles.countText}>{totalCount}</Text>
+          {roleFilter !== 'All' && (
+            <View style={styles.countBadge}>
+              <Text style={styles.countBadgeText}>{roleFilter}</Text>
+            </View>
+          )}
+        </View>
+      )}
       <View style={styles.searchRow}>
         <TextInput
           style={styles.searchInput}
@@ -492,5 +505,28 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: 15,
     paddingVertical: 40,
+  },
+  countHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  countText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  countBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: 'rgba(52, 152, 219, 0.15)',
+  },
+  countBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
 });

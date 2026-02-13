@@ -271,29 +271,29 @@ router.get('/analytics', authenticateToken, requireAdmin, async (req: AuthReques
 
     const [userGrowthRaw, dauRaw, workoutsRaw, nutritionRaw, revenueRaw, totalRevenueRaw] = await Promise.all([
       prisma.$queryRawUnsafe<{ date: string; count: bigint }[]>(
-        `SELECT DATE(created_at) as date, COUNT(*)::bigint as count FROM users WHERE created_at >= $1 GROUP BY DATE(created_at) ORDER BY date`,
+        `SELECT DATE("createdAt") as date, COUNT(*)::bigint as count FROM users WHERE "createdAt" >= $1::timestamp GROUP BY DATE("createdAt") ORDER BY date`,
         startISO
       ),
       prisma.$queryRawUnsafe<{ date: string; count: bigint }[]>(
-        `SELECT d.date, COUNT(DISTINCT d.user_id)::bigint as count FROM (
-          SELECT DATE(completed_at) as date, user_id FROM workout_sessions WHERE completed_at >= $1
+        `SELECT d.date, COUNT(DISTINCT d.uid)::bigint as count FROM (
+          SELECT DATE("completedAt") as date, "userId" as uid FROM workout_sessions WHERE "completedAt" >= $1::timestamp
           UNION ALL
-          SELECT DATE(created_at) as date, user_id FROM nutrition_logs WHERE created_at >= $1
+          SELECT DATE("date") as date, "userId" as uid FROM nutrition_logs WHERE "date" >= $1::timestamp
           UNION ALL
-          SELECT DATE(created_at) as date, user_id FROM activity_logs WHERE created_at >= $1
+          SELECT DATE("date") as date, "userId" as uid FROM activity_logs WHERE "date" >= $1::timestamp
         ) d GROUP BY d.date ORDER BY d.date`,
         startISO
       ),
       prisma.$queryRawUnsafe<{ date: string; count: bigint }[]>(
-        `SELECT DATE(completed_at) as date, COUNT(*)::bigint as count FROM workout_sessions WHERE completed_at >= $1 GROUP BY DATE(completed_at) ORDER BY date`,
+        `SELECT DATE("completedAt") as date, COUNT(*)::bigint as count FROM workout_sessions WHERE "completedAt" >= $1::timestamp GROUP BY DATE("completedAt") ORDER BY date`,
         startISO
       ),
       prisma.$queryRawUnsafe<{ date: string; count: bigint }[]>(
-        `SELECT DATE(created_at) as date, COUNT(*)::bigint as count FROM nutrition_logs WHERE created_at >= $1 GROUP BY DATE(created_at) ORDER BY date`,
+        `SELECT DATE("date") as date, COUNT(*)::bigint as count FROM nutrition_logs WHERE "date" >= $1::timestamp GROUP BY DATE("date") ORDER BY date`,
         startISO
       ),
       prisma.$queryRawUnsafe<{ date: string; amount: number }[]>(
-        `SELECT DATE(created_at) as date, COALESCE(SUM(price), 0)::float as amount FROM bookings WHERE status = 'COMPLETED' AND created_at >= $1 GROUP BY DATE(created_at) ORDER BY date`,
+        `SELECT DATE("createdAt") as date, COALESCE(SUM(price), 0)::float as amount FROM bookings WHERE status = 'COMPLETED' AND "createdAt" >= $1::timestamp GROUP BY DATE("createdAt") ORDER BY date`,
         startISO
       ),
       prisma.$queryRawUnsafe<{ total: number }[]>(
@@ -428,17 +428,17 @@ router.get('/analytics/engagement', authenticateToken, requireAdmin, async (req:
     const avgNutritionLogsPerUserPerDay = nutritionUserCount > 0 ? Math.round((nutritionCount / nutritionUserCount / days) * 10) / 10 : 0;
 
     const topExercisesRaw = await prisma.$queryRawUnsafe<{ name: string; count: bigint }[]>(
-      `SELECT exercise_name as name, COUNT(*)::bigint as count FROM workout_session_exercises GROUP BY exercise_name ORDER BY count DESC LIMIT 10`
+      `SELECT "exerciseName" as name, COUNT(*)::bigint as count FROM workout_session_exercises GROUP BY "exerciseName" ORDER BY count DESC LIMIT 10`
     );
 
     const topFoodsRaw = await prisma.$queryRawUnsafe<{ name: string; count: bigint }[]>(
-      `SELECT f.name, COUNT(*)::bigint as count FROM nutrition_logs nl JOIN foods f ON nl.food_id = f.id GROUP BY f.name ORDER BY count DESC LIMIT 10`
+      `SELECT f.name, COUNT(*)::bigint as count FROM nutrition_logs nl JOIN foods f ON nl."foodId" = f.id GROUP BY f.name ORDER BY count DESC LIMIT 10`
     );
 
     const heatmapStart = new Date(now);
     heatmapStart.setDate(heatmapStart.getDate() - 84);
     const heatmapRaw = await prisma.$queryRawUnsafe<{ date: string; count: bigint }[]>(
-      `SELECT DATE(completed_at) as date, COUNT(*)::bigint as count FROM workout_sessions WHERE completed_at >= $1 GROUP BY DATE(completed_at) ORDER BY date`,
+      `SELECT DATE("completedAt") as date, COUNT(*)::bigint as count FROM workout_sessions WHERE "completedAt" >= $1::timestamp GROUP BY DATE("completedAt") ORDER BY date`,
       heatmapStart.toISOString()
     );
 
