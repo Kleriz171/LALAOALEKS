@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { AdminAnalytics, AdminDemographics } from '../../types';
 import { GlassCard, COLORS } from '../../components/animations';
 import { LineChart, AreaChart, BarChart, RadarChart } from '../../components/charts';
@@ -28,22 +29,38 @@ const CONDITION_COLORS = [
   '#1abc9c', '#e67e22', '#34495e', '#16a085', '#c0392b',
 ];
 
-function SummaryPill({ icon, label, value, color }: {
+function SectionHeader({ title, subtitle, icon, color }: {
+  title: string; subtitle?: string; icon: keyof typeof Ionicons.glyphMap; color: string;
+}) {
+  return (
+    <View style={styles.sectionHeader}>
+      <View style={[styles.sectionIconWrap, { backgroundColor: `${color}15` }]}>
+        <Ionicons name={icon} size={16} color={color} />
+      </View>
+      <View style={styles.sectionHeaderText}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {subtitle && <Text style={styles.sectionSubtitle}>{subtitle}</Text>}
+      </View>
+    </View>
+  );
+}
+
+function MetricCard({ icon, label, value, color, subtext }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
   color: string;
+  subtext?: string;
 }) {
   return (
-    <View style={[styles.pill, { borderColor: `${color}30` }]}>
-      <View style={[styles.pillIcon, { backgroundColor: `${color}20` }]}>
-        <Ionicons name={icon} size={14} color={color} />
+    <GlassCard style={styles.metricCard} gradientColors={[`${color}12`, `${color}04`] as readonly [string, string]}>
+      <View style={[styles.metricIconBg, { backgroundColor: `${color}15` }]}>
+        <Ionicons name={icon} size={16} color={color} />
       </View>
-      <View>
-        <Text style={[styles.pillValue, { color }]}>{value}</Text>
-        <Text style={styles.pillLabel}>{label}</Text>
-      </View>
-    </View>
+      <Text style={[styles.metricValue, { color }]}>{value}</Text>
+      <Text style={styles.metricLabel}>{label}</Text>
+      {subtext && <Text style={styles.metricSubtext}>{subtext}</Text>}
+    </GlassCard>
   );
 }
 
@@ -75,6 +92,7 @@ export default function AdminAnalyticsSegment() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator color={COLORS.primary} size="large" />
+        <Text style={styles.loadingText}>Loading analytics...</Text>
       </View>
     );
   }
@@ -99,22 +117,30 @@ export default function AdminAnalyticsSegment() {
             style={[styles.dayChip, days === d && styles.dayChipActive]}
             onPress={() => setDays(d)}
           >
-            <Text style={[styles.dayChipText, days === d && styles.dayChipTextActive]}>{d}d</Text>
+            {days === d && (
+              <LinearGradient
+                colors={['rgba(231, 76, 60, 0.9)', 'rgba(192, 57, 43, 0.9)']}
+                style={StyleSheet.absoluteFill}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              />
+            )}
+            <Text style={[styles.dayChipText, days === d && styles.dayChipTextActive]}>{d} days</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      <View style={styles.pillRow}>
-        <SummaryPill icon="cash-outline" label="Revenue" value={`$${analytics.totalRevenue.toLocaleString()}`} color="#f39c12" />
-        <SummaryPill icon="barbell-outline" label="Sessions" value={totalWorkouts.toLocaleString()} color="#e74c3c" />
-        <SummaryPill icon="nutrition-outline" label="Logs" value={totalNutrition.toLocaleString()} color="#2ecc71" />
-        <SummaryPill icon="rocket-outline" label="Adoption" value={`${avgAdoption}%`} color="#3498db" />
+      <View style={styles.metricsRow}>
+        <MetricCard icon="cash-outline" label="Revenue" value={`$${analytics.totalRevenue.toLocaleString()}`} color="#f39c12" />
+        <MetricCard icon="barbell-outline" label="Sessions" value={totalWorkouts.toLocaleString()} color="#e74c3c" />
+        <MetricCard icon="nutrition-outline" label="Logs" value={totalNutrition.toLocaleString()} color="#2ecc71" />
+        <MetricCard icon="rocket-outline" label="Adoption" value={`${avgAdoption}%`} color="#3498db" />
       </View>
 
       {analytics.userGrowth.length > 0 && (
         <View style={styles.chartBlock}>
-          <Text style={styles.chartTitle}>User Growth</Text>
-          <GlassCard style={styles.chartCard}>
+          <SectionHeader title="User Growth" subtitle={`${days}-day registration trend`} icon="trending-up-outline" color="#3498db" />
+          <GlassCard style={styles.chartCard} borderGlow glowColor="rgba(52,152,219,0.08)">
             <LineChart
               data={analytics.userGrowth.map(d => ({ date: d.date, value: d.count }))}
               color="#3498db"
@@ -128,8 +154,8 @@ export default function AdminAnalyticsSegment() {
 
       {analytics.dailyActiveUsers.length > 0 && (
         <View style={styles.chartBlock}>
-          <Text style={styles.chartTitle}>Daily Active Users</Text>
-          <GlassCard style={styles.chartCard}>
+          <SectionHeader title="Daily Active Users" subtitle="Active session tracking" icon="people-outline" color="#2ecc71" />
+          <GlassCard style={styles.chartCard} borderGlow glowColor="rgba(46,204,113,0.08)">
             <AreaChart
               series={[{
                 data: analytics.dailyActiveUsers.map(d => ({ date: d.date, value: d.count })),
@@ -144,8 +170,18 @@ export default function AdminAnalyticsSegment() {
 
       {(analytics.workoutSessionsPerDay.length > 0 || analytics.nutritionLogsPerDay.length > 0) && (
         <View style={styles.chartBlock}>
-          <Text style={styles.chartTitle}>Platform Activity</Text>
+          <SectionHeader title="Platform Activity" subtitle="Workouts vs Nutrition logs" icon="layers-outline" color="#9b59b6" />
           <GlassCard style={styles.chartCard}>
+            <View style={styles.legendRow}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#e74c3c' }]} />
+                <Text style={styles.legendText}>Workouts</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#9b59b6' }]} />
+                <Text style={styles.legendText}>Nutrition</Text>
+              </View>
+            </View>
             <AreaChart
               series={[
                 {
@@ -167,9 +203,8 @@ export default function AdminAnalyticsSegment() {
 
       {analytics.revenue.length > 0 && (
         <View style={styles.chartBlock}>
-          <Text style={styles.chartTitle}>Revenue</Text>
-          <Text style={styles.chartSubtitle}>Total: ${analytics.totalRevenue.toLocaleString()}</Text>
-          <GlassCard style={styles.chartCard}>
+          <SectionHeader title="Revenue" subtitle={`Total: $${analytics.totalRevenue.toLocaleString()}`} icon="wallet-outline" color="#f39c12" />
+          <GlassCard style={styles.chartCard} borderGlow glowColor="rgba(243,156,18,0.08)">
             <LineChart
               data={analytics.revenue.map(d => ({ date: d.date, value: d.amount }))}
               color="#f39c12"
@@ -183,28 +218,56 @@ export default function AdminAnalyticsSegment() {
       )}
 
       <View style={styles.chartBlock}>
-        <Text style={styles.chartTitle}>Feature Adoption</Text>
+        <SectionHeader title="Feature Adoption" subtitle="Platform feature usage rates" icon="apps-outline" color="#1abc9c" />
         <GlassCard style={styles.chartCard}>
-          <RadarChart
-            data={[
-              { label: 'Workouts', value: analytics.featureAdoption.workouts.percentage, maxValue: 100 },
-              { label: 'Nutrition', value: analytics.featureAdoption.nutrition.percentage, maxValue: 100 },
-              { label: 'Activity', value: analytics.featureAdoption.activity.percentage, maxValue: 100 },
-              { label: 'Coaching', value: analytics.featureAdoption.coaching.percentage, maxValue: 100 },
-            ]}
-            color="#1abc9c"
-            size={220}
-          />
+          <View style={styles.adoptionGrid}>
+            {[
+              { label: 'Workouts', pct: analytics.featureAdoption.workouts.percentage, users: analytics.featureAdoption.workouts.users, color: '#e74c3c', icon: 'barbell' as const },
+              { label: 'Nutrition', pct: analytics.featureAdoption.nutrition.percentage, users: analytics.featureAdoption.nutrition.users, color: '#2ecc71', icon: 'nutrition' as const },
+              { label: 'Activity', pct: analytics.featureAdoption.activity.percentage, users: analytics.featureAdoption.activity.users, color: '#3498db', icon: 'footsteps' as const },
+              { label: 'Coaching', pct: analytics.featureAdoption.coaching.percentage, users: analytics.featureAdoption.coaching.users, color: '#9b59b6', icon: 'people' as const },
+            ].map(f => (
+              <View key={f.label} style={styles.adoptionItem}>
+                <View style={styles.adoptionTop}>
+                  <View style={[styles.adoptionIcon, { backgroundColor: `${f.color}15` }]}>
+                    <Ionicons name={f.icon} size={14} color={f.color} />
+                  </View>
+                  <Text style={[styles.adoptionPct, { color: f.color }]}>{f.pct}%</Text>
+                </View>
+                <View style={styles.adoptionBarTrack}>
+                  <View style={[styles.adoptionBarFill, { width: `${Math.min(f.pct, 100)}%`, backgroundColor: f.color }]} />
+                </View>
+                <Text style={styles.adoptionLabel}>{f.label}</Text>
+                <Text style={styles.adoptionUsers}>{f.users} users</Text>
+              </View>
+            ))}
+          </View>
+          <View style={styles.radarWrap}>
+            <RadarChart
+              data={[
+                { label: 'Workouts', value: analytics.featureAdoption.workouts.percentage, maxValue: 100 },
+                { label: 'Nutrition', value: analytics.featureAdoption.nutrition.percentage, maxValue: 100 },
+                { label: 'Activity', value: analytics.featureAdoption.activity.percentage, maxValue: 100 },
+                { label: 'Coaching', value: analytics.featureAdoption.coaching.percentage, maxValue: 100 },
+              ]}
+              color="#1abc9c"
+              size={200}
+            />
+          </View>
         </GlassCard>
       </View>
 
       {demographics && (
         <>
-          <Text style={styles.sectionHeader}>User Demographics</Text>
+          <View style={styles.demographicsHeader}>
+            <View style={styles.demographicsHeaderLine} />
+            <Text style={styles.demographicsHeaderText}>User Demographics</Text>
+            <View style={styles.demographicsHeaderLine} />
+          </View>
 
           {demographics.genderSplit.length > 0 && (
             <View style={styles.chartBlock}>
-              <Text style={styles.chartTitle}>Gender Split</Text>
+              <SectionHeader title="Gender Split" icon="male-female-outline" color="#3498db" />
               <GlassCard style={styles.chartCard}>
                 <BarChart
                   data={demographics.genderSplit.map(d => ({
@@ -223,7 +286,7 @@ export default function AdminAnalyticsSegment() {
 
           {demographics.activityLevels.length > 0 && (
             <View style={styles.chartBlock}>
-              <Text style={styles.chartTitle}>Activity Levels</Text>
+              <SectionHeader title="Activity Levels" icon="speedometer-outline" color="#2ecc71" />
               <GlassCard style={styles.chartCard}>
                 <BarChart
                   data={demographics.activityLevels.map(d => ({
@@ -242,7 +305,7 @@ export default function AdminAnalyticsSegment() {
 
           {demographics.healthConditions.length > 0 && (
             <View style={styles.chartBlock}>
-              <Text style={styles.chartTitle}>Top Health Conditions</Text>
+              <SectionHeader title="Top Health Conditions" subtitle="Most reported conditions" icon="medical-outline" color="#e74c3c" />
               <GlassCard style={styles.chartCard}>
                 <BarChart
                   data={demographics.healthConditions.map((d, i) => ({
@@ -261,7 +324,7 @@ export default function AdminAnalyticsSegment() {
 
           {demographics.goalDistribution.length > 0 && (
             <View style={styles.chartBlock}>
-              <Text style={styles.chartTitle}>Goal Distribution</Text>
+              <SectionHeader title="Goal Distribution" subtitle="What users are training for" icon="flag-outline" color="#3498db" />
               <GlassCard style={styles.chartCard}>
                 <BarChart
                   data={demographics.goalDistribution.map(d => ({ label: d.label.replace(/_/g, ' '), value: d.value }))}
@@ -276,7 +339,7 @@ export default function AdminAnalyticsSegment() {
 
           {demographics.experienceLevels.length > 0 && (
             <View style={styles.chartBlock}>
-              <Text style={styles.chartTitle}>Experience Levels</Text>
+              <SectionHeader title="Experience Levels" icon="school-outline" color="#e67e22" />
               <GlassCard style={styles.chartCard}>
                 <BarChart
                   data={demographics.experienceLevels.map(d => ({ label: d.label, value: d.value }))}
@@ -290,7 +353,7 @@ export default function AdminAnalyticsSegment() {
 
           {demographics.ageRanges.length > 0 && (
             <View style={styles.chartBlock}>
-              <Text style={styles.chartTitle}>Age Ranges</Text>
+              <SectionHeader title="Age Ranges" subtitle="User age distribution" icon="calendar-outline" color="#9b59b6" />
               <GlassCard style={styles.chartCard}>
                 <BarChart
                   data={demographics.ageRanges.map(d => ({ label: d.label, value: d.value }))}
@@ -311,6 +374,11 @@ const styles = StyleSheet.create({
   loadingContainer: {
     paddingVertical: 60,
     alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 13,
+    color: COLORS.textTertiary,
   },
   emptyText: {
     textAlign: 'center',
@@ -320,19 +388,20 @@ const styles = StyleSheet.create({
   },
   dayToggle: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
     marginBottom: 16,
   },
   dayChip: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
     backgroundColor: COLORS.cardBackground,
     borderWidth: 1,
     borderColor: COLORS.border,
+    alignItems: 'center',
+    overflow: 'hidden',
   },
   dayChipActive: {
-    backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
   dayChipText: {
@@ -342,60 +411,165 @@ const styles = StyleSheet.create({
   },
   dayChipTextActive: {
     color: '#fff',
+    fontWeight: '700',
   },
-  pillRow: {
+  metricsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
     marginBottom: 20,
   },
-  pill: {
+  metricCard: {
+    width: '48%',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    alignItems: 'flex-start',
+  },
+  metricIconBg: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  metricValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  metricLabel: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  metricSubtext: {
+    fontSize: 10,
+    color: COLORS.textTertiary,
+    marginTop: 1,
+  },
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: COLORS.cardBackground,
-    borderWidth: 1,
+    gap: 10,
+    marginBottom: 10,
   },
-  pillIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
+  sectionIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pillValue: {
-    fontSize: 14,
-    fontWeight: '700',
+  sectionHeaderText: {
+    flex: 1,
   },
-  pillLabel: {
-    fontSize: 10,
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  sectionSubtitle: {
+    fontSize: 11,
     color: COLORS.textTertiary,
+    marginTop: 1,
   },
   chartBlock: {
     marginBottom: 20,
   },
-  chartTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: 8,
-  },
-  chartSubtitle: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginBottom: 8,
-  },
   chartCard: {
-    padding: 12,
+    padding: 14,
   },
-  sectionHeader: {
+  legendRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 10,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  adoptionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  adoptionItem: {
+    width: '47%',
+  },
+  adoptionTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  adoptionIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adoptionPct: {
     fontSize: 18,
     fontWeight: '800',
-    color: COLORS.text,
+  },
+  adoptionBarTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  adoptionBarFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  adoptionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  adoptionUsers: {
+    fontSize: 10,
+    color: COLORS.textTertiary,
+  },
+  radarWrap: {
+    alignItems: 'center',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+  },
+  demographicsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
     marginTop: 12,
-    marginBottom: 16,
+    marginBottom: 20,
+  },
+  demographicsHeaderLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  demographicsHeaderText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
   },
 });

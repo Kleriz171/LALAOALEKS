@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated as RNAnimated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { AdminStats, AdminAnalytics } from '../../types';
 import { GlassCard, Skeleton, COLORS } from '../../components/animations';
 import { LineChart, AreaChart } from '../../components/charts';
@@ -54,7 +55,7 @@ function MiniSparkline({ data, color }: { data: { date: string; count: number }[
             height: Math.max(3, (d.count / max) * height),
             backgroundColor: color,
             borderRadius: 2,
-            opacity: 0.7 + (i / last7.length) * 0.3,
+            opacity: 0.5 + (i / last7.length) * 0.5,
           }}
         />
       ))}
@@ -65,8 +66,8 @@ function MiniSparkline({ data, color }: { data: { date: string; count: number }[
 function TrendArrow({ value }: { value: number }) {
   const isUp = value >= 0;
   return (
-    <View style={[styles.trendBadge, { backgroundColor: isUp ? 'rgba(46, 204, 113, 0.15)' : 'rgba(231, 76, 60, 0.15)' }]}>
-      <Ionicons name={isUp ? 'trending-up' : 'trending-down'} size={14} color={isUp ? '#2ecc71' : '#e74c3c'} />
+    <View style={[styles.trendBadge, { backgroundColor: isUp ? 'rgba(46, 204, 113, 0.12)' : 'rgba(231, 76, 60, 0.12)' }]}>
+      <Ionicons name={isUp ? 'trending-up' : 'trending-down'} size={12} color={isUp ? '#2ecc71' : '#e74c3c'} />
       <Text style={[styles.trendText, { color: isUp ? '#2ecc71' : '#e74c3c' }]}>
         {isUp ? '+' : ''}{value}%
       </Text>
@@ -74,13 +75,36 @@ function TrendArrow({ value }: { value: number }) {
   );
 }
 
+function SectionHeader({ title, subtitle, icon, color }: {
+  title: string; subtitle?: string; icon: keyof typeof Ionicons.glyphMap; color: string;
+}) {
+  return (
+    <View style={styles.sectionHeader}>
+      <View style={[styles.sectionIconWrap, { backgroundColor: `${color}15` }]}>
+        <Ionicons name={icon} size={16} color={color} />
+      </View>
+      <View style={styles.sectionHeaderText}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {subtitle && <Text style={styles.sectionSubtitle}>{subtitle}</Text>}
+      </View>
+    </View>
+  );
+}
+
 export default function AdminOverviewSegment({ stats, analytics, loading }: Props) {
   if (loading || !stats) {
     return (
-      <View style={styles.heroRow}>
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} width="31%" height={130} borderRadius={16} />
-        ))}
+      <View>
+        <View style={styles.heroRow}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} width="31%" height={140} borderRadius={16} />
+          ))}
+        </View>
+        <View style={styles.compactGrid}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} width="31%" height={70} borderRadius={12} />
+          ))}
+        </View>
       </View>
     );
   }
@@ -89,12 +113,13 @@ export default function AdminOverviewSegment({ stats, analytics, loading }: Prop
     ? Math.round((stats.newUsersThisWeek / stats.totalUsers) * 100)
     : 0;
 
-  const heroCards: { label: string; value: number; icon: keyof typeof Ionicons.glyphMap; color: string; extra: React.ReactNode }[] = [
+  const heroCards: { label: string; value: number; icon: keyof typeof Ionicons.glyphMap; color: string; gradient: readonly [string, string]; extra: React.ReactNode }[] = [
     {
       label: 'Total Users',
       value: stats.totalUsers,
       icon: 'people',
       color: '#3498db',
+      gradient: ['rgba(52, 152, 219, 0.15)', 'rgba(52, 152, 219, 0.03)'] as const,
       extra: analytics?.userGrowth ? <MiniSparkline data={analytics.userGrowth} color="#3498db" /> : null,
     },
     {
@@ -102,6 +127,7 @@ export default function AdminOverviewSegment({ stats, analytics, loading }: Prop
       value: stats.activeUsers,
       icon: 'pulse',
       color: '#2ecc71',
+      gradient: ['rgba(46, 204, 113, 0.15)', 'rgba(46, 204, 113, 0.03)'] as const,
       extra: <PulseDot color="#2ecc71" />,
     },
     {
@@ -109,6 +135,7 @@ export default function AdminOverviewSegment({ stats, analytics, loading }: Prop
       value: growthPct,
       icon: 'trending-up',
       color: '#9b59b6',
+      gradient: ['rgba(155, 89, 182, 0.15)', 'rgba(155, 89, 182, 0.03)'] as const,
       extra: <TrendArrow value={growthPct} />,
     },
   ];
@@ -126,8 +153,17 @@ export default function AdminOverviewSegment({ stats, analytics, loading }: Prop
     <View>
       <View style={styles.heroRow}>
         {heroCards.map((card, i) => (
-          <GlassCard key={card.label} delay={100 + i * 80} style={styles.heroCard} borderGlow glowColor={card.color}>
-            <Ionicons name={card.icon} size={22} color={card.color} />
+          <GlassCard
+            key={card.label}
+            delay={100 + i * 80}
+            style={styles.heroCard}
+            borderGlow
+            glowColor={card.color}
+            gradientColors={card.gradient}
+          >
+            <View style={[styles.heroIconWrap, { backgroundColor: `${card.color}18` }]}>
+              <Ionicons name={card.icon} size={20} color={card.color} />
+            </View>
             <Text style={[styles.heroValue, { color: card.color }]}>
               {card.label === 'Growth' ? `${card.value}%` : card.value.toLocaleString()}
             </Text>
@@ -140,14 +176,12 @@ export default function AdminOverviewSegment({ stats, analytics, loading }: Prop
       <View style={styles.compactGrid}>
         {compactKpis.map((kpi, i) => (
           <GlassCard key={kpi.label} delay={300 + i * 40} style={styles.compactCard}>
-            <View style={styles.compactRow}>
-              <View style={[styles.compactIconBg, { backgroundColor: `${kpi.color}20` }]}>
+            <View style={styles.compactInner}>
+              <View style={[styles.compactIconBg, { backgroundColor: `${kpi.color}15` }]}>
                 <Ionicons name={kpi.icon} size={14} color={kpi.color} />
               </View>
-              <View style={styles.compactInfo}>
-                <Text style={[styles.compactValue, { color: kpi.color }]}>{kpi.value.toLocaleString()}</Text>
-                <Text style={styles.compactLabel}>{kpi.label}</Text>
-              </View>
+              <Text style={[styles.compactValue, { color: kpi.color }]}>{kpi.value.toLocaleString()}</Text>
+              <Text style={styles.compactLabel}>{kpi.label}</Text>
             </View>
           </GlassCard>
         ))}
@@ -155,12 +189,17 @@ export default function AdminOverviewSegment({ stats, analytics, loading }: Prop
 
       {analytics && analytics.userGrowth.length > 0 && (
         <View style={styles.chartSection}>
-          <Text style={styles.sectionTitle}>User Growth (30d)</Text>
-          <GlassCard style={styles.chartCard} borderGlow glowColor="rgba(52,152,219,0.15)">
+          <SectionHeader
+            title="User Growth"
+            subtitle="Last 30 days trend"
+            icon="trending-up-outline"
+            color="#3498db"
+          />
+          <GlassCard style={styles.chartCard} borderGlow glowColor="rgba(52,152,219,0.1)">
             <LineChart
               data={analytics.userGrowth.map(d => ({ date: d.date, value: d.count }))}
               color="#3498db"
-              height={160}
+              height={170}
               gradientFill
               showDots
             />
@@ -170,15 +209,20 @@ export default function AdminOverviewSegment({ stats, analytics, loading }: Prop
 
       {analytics && analytics.dailyActiveUsers.length > 0 && (
         <View style={styles.chartSection}>
-          <Text style={styles.sectionTitle}>Daily Active Users</Text>
-          <GlassCard style={styles.chartCard} borderGlow glowColor="rgba(46,204,113,0.15)">
+          <SectionHeader
+            title="Daily Active Users"
+            subtitle="User engagement over time"
+            icon="people-outline"
+            color="#2ecc71"
+          />
+          <GlassCard style={styles.chartCard} borderGlow glowColor="rgba(46,204,113,0.1)">
             <AreaChart
               series={[{
                 data: analytics.dailyActiveUsers.map(d => ({ date: d.date, value: d.count })),
                 color: '#2ecc71',
                 label: 'DAU',
               }]}
-              height={160}
+              height={170}
             />
           </GlassCard>
         </View>
@@ -186,33 +230,58 @@ export default function AdminOverviewSegment({ stats, analytics, loading }: Prop
 
       {(stats.pendingApplications > 0 || stats.bannedUsers > 0) && (
         <View style={styles.alertsSection}>
-          <Text style={styles.sectionTitle}>Alerts</Text>
+          <SectionHeader
+            title="Alerts"
+            subtitle="Items requiring attention"
+            icon="alert-circle-outline"
+            color="#f39c12"
+          />
           {stats.pendingApplications > 0 && (
-            <GlassCard style={styles.alertCard} borderGlow glowColor="#f39c12">
-              <View style={styles.alertIconWrap}>
-                <Ionicons name="warning" size={18} color="#f39c12" />
+            <GlassCard style={styles.alertCard} borderGlow glowColor="rgba(243,156,18,0.15)">
+              <LinearGradient
+                colors={['rgba(243, 156, 18, 0.08)', 'rgba(243, 156, 18, 0.02)']}
+                style={StyleSheet.absoluteFill}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              />
+              <View style={styles.alertRow}>
+                <View style={[styles.alertIconWrap, { backgroundColor: 'rgba(243,156,18,0.15)' }]}>
+                  <Ionicons name="document-text" size={18} color="#f39c12" />
+                </View>
+                <View style={styles.alertContent}>
+                  <Text style={styles.alertTitle}>
+                    {stats.pendingApplications} pending application{stats.pendingApplications > 1 ? 's' : ''}
+                  </Text>
+                  <Text style={styles.alertHint}>Review in Applications tab</Text>
+                </View>
+                <View style={styles.alertArrow}>
+                  <Ionicons name="chevron-forward" size={16} color={COLORS.textTertiary} />
+                </View>
               </View>
-              <View style={styles.alertContent}>
-                <Text style={styles.alertTitle}>
-                  {stats.pendingApplications} pending application{stats.pendingApplications > 1 ? 's' : ''}
-                </Text>
-                <Text style={styles.alertHint}>Review in Applications tab</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={COLORS.textTertiary} />
             </GlassCard>
           )}
           {stats.bannedUsers > 0 && (
-            <GlassCard style={styles.alertCard} borderGlow glowColor="#e74c3c">
-              <View style={[styles.alertIconWrap, { backgroundColor: 'rgba(231,76,60,0.15)' }]}>
-                <Ionicons name="ban" size={18} color="#e74c3c" />
+            <GlassCard style={styles.alertCard} borderGlow glowColor="rgba(231,76,60,0.15)">
+              <LinearGradient
+                colors={['rgba(231, 76, 60, 0.08)', 'rgba(231, 76, 60, 0.02)']}
+                style={StyleSheet.absoluteFill}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              />
+              <View style={styles.alertRow}>
+                <View style={[styles.alertIconWrap, { backgroundColor: 'rgba(231,76,60,0.15)' }]}>
+                  <Ionicons name="ban" size={18} color="#e74c3c" />
+                </View>
+                <View style={styles.alertContent}>
+                  <Text style={styles.alertTitle}>
+                    {stats.bannedUsers} banned user{stats.bannedUsers > 1 ? 's' : ''}
+                  </Text>
+                  <Text style={styles.alertHint}>Manage in Users tab</Text>
+                </View>
+                <View style={styles.alertArrow}>
+                  <Ionicons name="chevron-forward" size={16} color={COLORS.textTertiary} />
+                </View>
               </View>
-              <View style={styles.alertContent}>
-                <Text style={styles.alertTitle}>
-                  {stats.bannedUsers} banned user{stats.bannedUsers > 1 ? 's' : ''}
-                </Text>
-                <Text style={styles.alertHint}>Manage in Users tab</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={COLORS.textTertiary} />
             </GlassCard>
           )}
         </View>
@@ -225,25 +294,34 @@ const styles = StyleSheet.create({
   heroRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   heroCard: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 18,
+    paddingVertical: 16,
     paddingHorizontal: 8,
-    minHeight: 130,
+    minHeight: 140,
+  },
+  heroIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
   heroValue: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    marginTop: 8,
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
   heroLabel: {
     fontSize: 11,
     color: COLORS.textSecondary,
-    marginTop: 4,
+    marginTop: 3,
     fontWeight: '600',
+    letterSpacing: 0.3,
   },
   heroExtra: {
     marginTop: 8,
@@ -260,7 +338,7 @@ const styles = StyleSheet.create({
     gap: 3,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 10,
+    borderRadius: 8,
   },
   trendText: {
     fontSize: 11,
@@ -275,40 +353,57 @@ const styles = StyleSheet.create({
   compactCard: {
     width: '31%',
     paddingVertical: 12,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
   },
-  compactRow: {
-    flexDirection: 'row',
+  compactInner: {
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
   },
   compactIconBg: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  compactInfo: {
-    flex: 1,
-  },
   compactValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
   compactLabel: {
     fontSize: 10,
     color: COLORS.textTertiary,
-    marginTop: 1,
+    fontWeight: '600',
   },
-  chartSection: {
-    marginTop: 20,
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  sectionIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionHeaderText: {
+    flex: 1,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: COLORS.text,
-    marginBottom: 10,
+  },
+  sectionSubtitle: {
+    fontSize: 11,
+    color: COLORS.textTertiary,
+    marginTop: 1,
+  },
+  chartSection: {
+    marginTop: 20,
   },
   chartCard: {
     padding: 12,
@@ -317,17 +412,20 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   alertCard: {
+    marginBottom: 8,
+    padding: 0,
+    overflow: 'hidden',
+  },
+  alertRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     padding: 14,
-    marginBottom: 8,
   },
   alertIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: 'rgba(243,156,18,0.15)',
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -343,5 +441,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textTertiary,
     marginTop: 2,
+  },
+  alertArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
