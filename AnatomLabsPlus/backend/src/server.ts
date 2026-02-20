@@ -98,7 +98,7 @@ app.use((req: Request, res: Response) => {
   });
 });
 
-app.listen(PORT, () => {
+app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`
 ╔═══════════════════════════════════════════════════════╗
 ║  Human Performance Science Platform API               ║
