@@ -56,7 +56,7 @@ import {
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
-const PRODUCTION_API_URL = 'https://anatomlabs-production.up.railway.app/api';
+const PRODUCTION_API_URL = 'https://anatomlabs.onrender.com/api';
 
 const getApiUrl = () => {
   if (__DEV__) {
