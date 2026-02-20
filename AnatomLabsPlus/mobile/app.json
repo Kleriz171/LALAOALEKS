@@ -43,7 +43,11 @@
     },
     "plugins": [
       "./plugins/withPickerFix",
-      "expo-build-properties",
+      ["expo-build-properties", {
+        "android": {
+          "minSdkVersion": 26
+        }
+      }],
       [
         "expo-camera",
         {
