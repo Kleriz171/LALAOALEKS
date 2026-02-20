@@ -3,7 +3,7 @@ services:
     name: anatomlabs-backend
     runtime: node
     rootDir: .
-    buildCommand: npm install && npm run build && npx prisma generate
+    buildCommand: npm install --include=dev && npm run build && npx prisma generate
     startCommand: npx prisma migrate deploy && node dist/server.js
     healthCheckPath: /health
     envVars:
