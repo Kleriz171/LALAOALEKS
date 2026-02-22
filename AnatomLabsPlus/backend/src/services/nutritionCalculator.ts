@@ -6,7 +6,7 @@ export interface UserPhysicalData {
   weight: number;
   height: number;
   activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
-  fitnessGoal: 'muscle_gain' | 'fat_loss' | 'endurance' | 'general_fitness' | 'sport_specific';
+  fitnessGoal: 'muscle_gain' | 'fat_loss' | 'body_recomposition' | 'endurance' | 'general_fitness' | 'sport_specific';
 }
 
 export interface UserHealthProfile {
@@ -86,6 +86,8 @@ export function calculateTargetCalories(tdee: number, goal: string): number {
       return Math.round(tdee * 1.15);
     case 'fat_loss':
       return Math.round(tdee * 0.80);
+    case 'body_recomposition':
+      return tdee;
     case 'endurance':
       return Math.round(tdee * 1.05);
     case 'sport_specific':
@@ -106,11 +108,15 @@ export function calculateMacros(
 
   switch (goal) {
     case 'muscle_gain':
-      proteinGramsPerKg = 2.0;
+      proteinGramsPerKg = 1.6;
       fatPercentage = 25;
       break;
     case 'fat_loss':
-      proteinGramsPerKg = 2.3;
+      proteinGramsPerKg = 1.8;
+      fatPercentage = 25;
+      break;
+    case 'body_recomposition':
+      proteinGramsPerKg = 1.8;
       fatPercentage = 25;
       break;
     case 'endurance':
@@ -201,6 +207,8 @@ function getCalorieAdjustmentExplanation(goal: string): string {
       return '+15% calorie surplus to support muscle protein synthesis and recovery';
     case 'fat_loss':
       return '-20% calorie deficit to create energy deficit while preserving muscle mass';
+    case 'body_recomposition':
+      return 'Maintenance calories — supports simultaneous fat loss and muscle gain through proper training and nutrition';
     case 'endurance':
       return '+5% surplus to fuel high-volume training demands';
     case 'sport_specific':
@@ -213,9 +221,11 @@ function getCalorieAdjustmentExplanation(goal: string): string {
 function getMacroRationale(goal: string): string {
   switch (goal) {
     case 'muscle_gain':
-      return 'High protein (2.0g/kg) for muscle synthesis, moderate fat for hormones, remaining carbs for training energy';
+      return 'Protein (1.6g/kg) for muscle synthesis, moderate fat for hormones, remaining carbs for training energy';
     case 'fat_loss':
-      return 'Very high protein (2.3g/kg) to preserve muscle in deficit, balanced fat and carbs';
+      return 'Higher protein (1.8g/kg) to preserve muscle in deficit, balanced fat and carbs';
+    case 'body_recomposition':
+      return 'Higher protein (1.8g/kg) at maintenance calories — combined with progressive training enables simultaneous muscle growth and fat loss';
     case 'endurance':
       return 'Moderate protein (1.6g/kg), lower fat (20%), high carbs for sustained energy';
     case 'sport_specific':

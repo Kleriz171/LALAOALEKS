@@ -640,7 +640,7 @@ export default function HomeScreen({ navigation }: any) {
               </>
             ) : (
               [
-                { label: 'Goal', value: user?.goal?.replace('_', ' ') || 'Not set' },
+                { label: 'Goal', value: user?.goal?.replace(/_/g, ' ') || 'Not set' },
                 { label: 'Level', value: user?.experienceLevel || 'Not set' },
                 { label: 'Weight', value: `${user?.weight || 0} kg` },
                 { label: 'Height', value: `${user?.height || 0} cm` },

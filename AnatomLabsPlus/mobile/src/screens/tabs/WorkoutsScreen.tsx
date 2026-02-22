@@ -725,7 +725,8 @@ export default function WorkoutsScreen() {
                   <Picker selectedValue={goal} onValueChange={(v) => { trigger('selection'); setGoal(v); }} style={styles.picker}>
                     <Picker.Item label="Muscle Gain" value="muscle_gain" />
                     <Picker.Item label="Fat Loss" value="fat_loss" />
-                    <Picker.Item label="Strength" value="strength" />
+                    <Picker.Item label="Body Recomposition" value="body_recomposition" />
+                    <Picker.Item label="General Fitness" value="general_fitness" />
                     <Picker.Item label="Endurance" value="endurance" />
                   </Picker>
                 </View>

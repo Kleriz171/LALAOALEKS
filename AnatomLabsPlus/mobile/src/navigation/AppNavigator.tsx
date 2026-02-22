@@ -11,6 +11,7 @@ import Animated, {
   useSharedValue,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
@@ -78,6 +79,9 @@ function AnimatedTabIcon({ name, focused, color, size }: { name: string; focused
 }
 
 function TabNavigator() {
+  const insets = useSafeAreaInsets();
+  const androidBottomPadding = Math.max(insets.bottom, 8);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -91,9 +95,9 @@ function TabNavigator() {
           backgroundColor: Platform.OS === 'ios' ? 'transparent' : 'rgba(10, 10, 10, 0.95)',
           borderTopColor: 'rgba(51, 51, 51, 0.5)',
           borderTopWidth: StyleSheet.hairlineWidth,
-          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+          paddingBottom: Platform.OS === 'ios' ? 20 : androidBottomPadding,
           paddingTop: 8,
-          height: Platform.OS === 'ios' ? 85 : 60,
+          height: Platform.OS === 'ios' ? 85 : 52 + androidBottomPadding,
         },
         tabBarBackground: () =>
           Platform.OS === 'ios' ? (

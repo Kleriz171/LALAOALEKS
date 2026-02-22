@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   DailyNutritionSummary,
   NutritionPlan,
@@ -12,9 +13,20 @@ import {
 } from '../types';
 import api from '../services/api';
 
+const OVERRIDES_KEY = 'nutrition_overrides';
+
+export interface NutritionOverrides {
+  targetCalories?: number;
+  proteinPct?: number;
+  carbsPct?: number;
+  fatPct?: number;
+}
+
 interface NutritionContextType {
   todaySummary: DailyNutritionSummary | null;
   targets: NutritionPlan | null;
+  effectiveTargets: NutritionPlan | null;
+  overrides: NutritionOverrides;
   streak: UserStreak | null;
   weightTrend: WeightTrend | null;
   recentFoods: RecentFoodsResponse | null;
@@ -27,6 +39,9 @@ interface NutritionContextType {
   refreshWeightTrend: () => Promise<void>;
   refreshRecentFoods: () => Promise<void>;
   refreshAll: () => Promise<void>;
+
+  saveOverrides: (o: NutritionOverrides) => Promise<void>;
+  clearOverrides: () => Promise<void>;
 
   logFood: (foodId: string, servings: number, mealType: string) => Promise<StreakUpdate | null>;
   updateLog: (logId: string, servings?: number, mealType?: string) => Promise<void>;
@@ -48,14 +63,65 @@ interface NutritionProviderProps {
   children: ReactNode;
 }
 
+function applyOverrides(base: NutritionPlan | null, overrides: NutritionOverrides): NutritionPlan | null {
+  if (!base) return null;
+  if (!overrides.targetCalories && !overrides.proteinPct && !overrides.carbsPct && !overrides.fatPct) return base;
+
+  const calories = overrides.targetCalories ?? base.targetCalories;
+  const pPct = overrides.proteinPct ?? base.macros.proteinPercentage ?? Math.round((base.macros.protein * 4 / base.targetCalories) * 100);
+  const cPct = overrides.carbsPct ?? base.macros.carbsPercentage ?? Math.round((base.macros.carbs * 4 / base.targetCalories) * 100);
+  const fPct = overrides.fatPct ?? base.macros.fatPercentage ?? Math.round((base.macros.fat * 9 / base.targetCalories) * 100);
+
+  const protein = Math.round((calories * pPct / 100) / 4);
+  const carbs = Math.round((calories * cPct / 100) / 4);
+  const fat = Math.round((calories * fPct / 100) / 9);
+
+  return {
+    ...base,
+    targetCalories: calories,
+    macros: {
+      ...base.macros,
+      protein,
+      carbs,
+      fat,
+      proteinPercentage: pPct,
+      carbsPercentage: cPct,
+      fatPercentage: fPct,
+    },
+  };
+}
+
 export const NutritionProvider: React.FC<NutritionProviderProps> = ({ children }) => {
   const [todaySummary, setTodaySummary] = useState<DailyNutritionSummary | null>(null);
   const [targets, setTargets] = useState<NutritionPlan | null>(null);
+  const [overrides, setOverrides] = useState<NutritionOverrides>({});
   const [streak, setStreak] = useState<UserStreak | null>(null);
   const [weightTrend, setWeightTrend] = useState<WeightTrend | null>(null);
   const [recentFoods, setRecentFoods] = useState<RecentFoodsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(OVERRIDES_KEY).then(stored => {
+      if (stored) {
+        try {
+          setOverrides(JSON.parse(stored));
+        } catch {}
+      }
+    });
+  }, []);
+
+  const effectiveTargets = applyOverrides(targets, overrides);
+
+  const saveOverrides = useCallback(async (o: NutritionOverrides) => {
+    setOverrides(o);
+    await AsyncStorage.setItem(OVERRIDES_KEY, JSON.stringify(o));
+  }, []);
+
+  const clearOverrides = useCallback(async () => {
+    setOverrides({});
+    await AsyncStorage.removeItem(OVERRIDES_KEY);
+  }, []);
 
   const refreshToday = useCallback(async () => {
     try {
@@ -128,7 +194,6 @@ export const NutritionProvider: React.FC<NutritionProviderProps> = ({ children }
     try {
       const result = await api.logFoodWithStreak({ foodId, servings, mealType });
 
-      // Update streak immediately
       setStreak({
         currentStreak: result.streak.currentStreak,
         longestStreak: result.streak.longestStreak,
@@ -136,7 +201,6 @@ export const NutritionProvider: React.FC<NutritionProviderProps> = ({ children }
         lastLoggedDate: result.streak.lastLoggedDate,
       });
 
-      // Refresh today's summary
       await refreshToday();
       await refreshRecentFoods();
 
@@ -186,6 +250,8 @@ export const NutritionProvider: React.FC<NutritionProviderProps> = ({ children }
       value={{
         todaySummary,
         targets,
+        effectiveTargets,
+        overrides,
         streak,
         weightTrend,
         recentFoods,
@@ -197,6 +263,8 @@ export const NutritionProvider: React.FC<NutritionProviderProps> = ({ children }
         refreshWeightTrend,
         refreshRecentFoods,
         refreshAll,
+        saveOverrides,
+        clearOverrides,
         logFood,
         updateLog,
         deleteLog,

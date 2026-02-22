@@ -62,6 +62,8 @@ export default function NutritionScreen() {
   const {
     todaySummary,
     targets,
+    effectiveTargets,
+    overrides,
     streak,
     weightTrend,
     recentFoods,
@@ -71,6 +73,8 @@ export default function NutritionScreen() {
     logFood,
     deleteLog,
     logWeight,
+    saveOverrides,
+    clearOverrides,
   } = useNutrition();
 
   const { workoutHistory } = useWorkoutTracking();
@@ -88,7 +92,11 @@ export default function NutritionScreen() {
   const [showFormulas, setShowFormulas] = useState(false);
   const [weightInput, setWeightInput] = useState('');
   const [weightHistory, setWeightHistory] = useState<WeightLog[]>([]);
-  const [localTargets, setLocalTargets] = useState<NutritionPlan | null>(null);
+  const [showCustomizeModal, setShowCustomizeModal] = useState(false);
+  const [customCalories, setCustomCalories] = useState('');
+  const [customProteinPct, setCustomProteinPct] = useState('');
+  const [customCarbsPct, setCustomCarbsPct] = useState('');
+  const [customFatPct, setCustomFatPct] = useState('');
   const [calorieHistory, setCalorieHistory] = useState<{
     history: Array<{ date: string; calories: number; dayOfWeek: string }>;
     stats: { average: number; target: number; adherence: number; daysTracked: number; totalDays: number };
@@ -112,7 +120,6 @@ export default function NutritionScreen() {
   const loadInitialData = async () => {
     await refreshAll();
     loadWeightHistory();
-    loadTargets();
     loadCalorieHistory();
     loadUserAllergies();
   };
@@ -180,21 +187,11 @@ export default function NutritionScreen() {
     }
   };
 
-  const loadTargets = async () => {
-    try {
-      const plan = await api.calculateNutrition();
-      setLocalTargets(plan);
-    } catch (error) {
-      console.error('Failed to load targets:', error);
-    }
-  };
-
   const onRefresh = async () => {
     setIsRefreshing(true);
     trigger('light');
     await refreshAll();
     await loadWeightHistory();
-    await loadTargets();
     await loadCalorieHistory();
     setIsRefreshing(false);
     trigger('success');
@@ -267,6 +264,60 @@ export default function NutritionScreen() {
     }
   };
 
+  const openCustomizeModal = () => {
+    setCustomCalories(overrides.targetCalories?.toString() ?? currentTargets?.targetCalories?.toString() ?? '');
+    const pPct = overrides.proteinPct ?? currentTargets?.macros?.proteinPercentage;
+    const cPct = overrides.carbsPct ?? currentTargets?.macros?.carbsPercentage;
+    const fPct = overrides.fatPct ?? currentTargets?.macros?.fatPercentage;
+    setCustomProteinPct(pPct?.toString() ?? '');
+    setCustomCarbsPct(cPct?.toString() ?? '');
+    setCustomFatPct(fPct?.toString() ?? '');
+    setShowCustomizeModal(true);
+  };
+
+  const handleSaveCustomize = async () => {
+    const cal = parseInt(customCalories);
+    const pPct = parseInt(customProteinPct);
+    const cPct = parseInt(customCarbsPct);
+    const fPct = parseInt(customFatPct);
+
+    const hasMacroPcts = customProteinPct || customCarbsPct || customFatPct;
+    if (hasMacroPcts) {
+      if (isNaN(pPct) || isNaN(cPct) || isNaN(fPct)) {
+        Alert.alert('Invalid Input', 'Enter whole numbers for all three macro percentages.');
+        return;
+      }
+      if (pPct + cPct + fPct !== 100) {
+        Alert.alert('Invalid Percentages', `Protein (${pPct}%) + Carbs (${cPct}%) + Fat (${fPct}%) must equal 100%. Current total: ${pPct + cPct + fPct}%.`);
+        return;
+      }
+      if (pPct < 5 || cPct < 5 || fPct < 5) {
+        Alert.alert('Invalid Percentages', 'Each macro must be at least 5%.');
+        return;
+      }
+    }
+
+    if (customCalories && (isNaN(cal) || cal < 500 || cal > 10000)) {
+      Alert.alert('Invalid Calories', 'Enter a calorie target between 500 and 10,000.');
+      return;
+    }
+
+    await saveOverrides({
+      targetCalories: customCalories ? cal : undefined,
+      proteinPct: hasMacroPcts ? pPct : undefined,
+      carbsPct: hasMacroPcts ? cPct : undefined,
+      fatPct: hasMacroPcts ? fPct : undefined,
+    });
+    trigger('success');
+    setShowCustomizeModal(false);
+  };
+
+  const handleClearCustomize = async () => {
+    await clearOverrides();
+    trigger('light');
+    setShowCustomizeModal(false);
+  };
+
   const handleTabChange = (tab: TabType) => {
     trigger('selection');
     setActiveTab(tab);
@@ -276,7 +327,7 @@ export default function NutritionScreen() {
 
   // Calculate consumed nutrients
   const consumed = todaySummary?.totals || { calories: 0, protein: 0, carbs: 0, fat: 0 };
-  const currentTargets = localTargets || targets;
+  const currentTargets = effectiveTargets;
   const targetValues = currentTargets
     ? { targetCalories: currentTargets.targetCalories, macros: currentTargets.macros }
     : { targetCalories: 2000, macros: { protein: 150, carbs: 250, fat: 67 } };
@@ -723,6 +774,8 @@ export default function NutritionScreen() {
     );
   };
 
+  const hasOverrides = !!(overrides.targetCalories || overrides.proteinPct);
+
   const renderGoalsTab = () => (
     <>
       {currentTargets && (
@@ -745,8 +798,8 @@ export default function NutritionScreen() {
                 <Text style={[styles.goalValue, styles.targetValue]}>
                   {Math.round(currentTargets.targetCalories || 0)}
                 </Text>
-                <Text style={styles.goalLabel}>TARGET</Text>
-                <Text style={styles.goalSubtext}>Daily Goal</Text>
+                <Text style={styles.goalLabel}>TARGET{hasOverrides ? ' *' : ''}</Text>
+                <Text style={styles.goalSubtext}>{hasOverrides ? 'Custom goal' : 'Daily Goal'}</Text>
               </View>
             </View>
           </SlideIn>
@@ -778,10 +831,20 @@ export default function NutritionScreen() {
                   </View>
                   <Text style={styles.macroGoalCalories}>
                     {Math.round(macro.value * (macro.name === 'Fat' ? 9 : 4))} kcal
+                    {' · '}
+                    {Math.round((macro.value * (macro.name === 'Fat' ? 9 : 4) / currentTargets.targetCalories) * 100)}%
                   </Text>
                 </View>
               ))}
             </GlassCard>
+          </SlideIn>
+
+          <SlideIn direction="bottom" delay={250}>
+            <TouchableOpacity style={styles.customizeButton} onPress={openCustomizeModal}>
+              <Ionicons name="options-outline" size={18} color={COLORS.primary} />
+              <Text style={styles.customizeButtonText}>Customize Targets</Text>
+              {hasOverrides && <View style={styles.overrideBadge}><Text style={styles.overrideBadgeText}>Custom</Text></View>}
+            </TouchableOpacity>
           </SlideIn>
 
           <TouchableOpacity style={styles.formulasToggle} onPress={() => setShowFormulas(!showFormulas)}>
@@ -1021,6 +1084,96 @@ export default function NutritionScreen() {
                 </TouchableOpacity>
               );
             })}
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Customize Targets Modal */}
+      <Modal
+        visible={showCustomizeModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowCustomizeModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Customize Targets</Text>
+            <AnimatedButton
+              variant="ghost"
+              size="small"
+              onPress={() => setShowCustomizeModal(false)}
+              title="Cancel"
+              textStyle={{ color: COLORS.primary }}
+            />
+          </View>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+            <GlassCard style={{ padding: 14, marginBottom: 16 }}>
+              <Text style={[styles.sectionTitle, { marginBottom: 4 }]}>Daily Calorie Target</Text>
+              <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginBottom: 12 }}>
+                Leave blank to use the calculated target ({currentTargets?.tdee ? `TDEE: ${Math.round(currentTargets.tdee)} kcal` : ''})
+              </Text>
+              <View style={styles.weightInputContainer}>
+                <TextInput
+                  style={styles.weightInput}
+                  placeholder={currentTargets?.targetCalories?.toString() ?? '2000'}
+                  placeholderTextColor={COLORS.textTertiary}
+                  keyboardType="numeric"
+                  value={customCalories}
+                  onChangeText={setCustomCalories}
+                />
+                <Text style={styles.weightUnit}>kcal</Text>
+              </View>
+            </GlassCard>
+
+            <GlassCard style={{ padding: 14, marginBottom: 16 }}>
+              <Text style={[styles.sectionTitle, { marginBottom: 4 }]}>Macro Percentages</Text>
+              <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginBottom: 12 }}>
+                Must add up to 100%. Leave all blank to use calculated split.
+              </Text>
+              {[
+                { label: 'Protein %', value: customProteinPct, setter: setCustomProteinPct, color: COLORS.primary },
+                { label: 'Carbs %', value: customCarbsPct, setter: setCustomCarbsPct, color: COLORS.info },
+                { label: 'Fat %', value: customFatPct, setter: setCustomFatPct, color: COLORS.warning },
+              ].map(({ label, value, setter, color }) => (
+                <View key={label} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                  <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color }}>{label}</Text>
+                  <TextInput
+                    style={[styles.weightInput, { flex: 0, width: 80, textAlign: 'center' }]}
+                    placeholder="--"
+                    placeholderTextColor={COLORS.textTertiary}
+                    keyboardType="numeric"
+                    value={value}
+                    onChangeText={setter}
+                  />
+                  <Text style={[styles.weightUnit, { marginLeft: 8 }]}>%</Text>
+                </View>
+              ))}
+              {customProteinPct && customCarbsPct && customFatPct && (
+                <Text style={{
+                  fontSize: 12,
+                  color: (parseInt(customProteinPct) + parseInt(customCarbsPct) + parseInt(customFatPct)) === 100
+                    ? COLORS.success : COLORS.warning,
+                  marginTop: 4,
+                }}>
+                  Total: {(parseInt(customProteinPct) || 0) + (parseInt(customCarbsPct) || 0) + (parseInt(customFatPct) || 0)}%
+                  {(parseInt(customProteinPct) + parseInt(customCarbsPct) + parseInt(customFatPct)) === 100 ? ' ✓' : ' (must equal 100%)'}
+                </Text>
+              )}
+            </GlassCard>
+
+            <TouchableOpacity style={styles.saveButton} onPress={handleSaveCustomize}>
+              <Ionicons name="checkmark-circle" size={22} color="#fff" />
+              <Text style={styles.saveButtonText}>Save Custom Targets</Text>
+            </TouchableOpacity>
+
+            {hasOverrides && (
+              <TouchableOpacity
+                style={[styles.formulasToggle, { marginTop: 12 }]}
+                onPress={handleClearCustomize}
+              >
+                <Text style={[styles.formulasToggleText, { color: COLORS.warning }]}>Reset to Calculated Targets</Text>
+              </TouchableOpacity>
+            )}
           </ScrollView>
         </View>
       </Modal>
@@ -1709,6 +1862,34 @@ const styles = StyleSheet.create({
   macroGoalCalories: {
     fontSize: 11,
     color: COLORS.textSecondary,
+  },
+  customizeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 14,
+    backgroundColor: `${COLORS.primary}15`,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: `${COLORS.primary}40`,
+    marginBottom: 12,
+  },
+  customizeButtonText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  overrideBadge: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  overrideBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#fff',
   },
   formulasToggle: {
     padding: 14,

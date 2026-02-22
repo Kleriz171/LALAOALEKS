@@ -12,11 +12,19 @@ const storage = multer.diskStorage({
   },
 });
 
+const ALLOWED_PDF_MIMES = [
+  'application/pdf',
+  'application/octet-stream',
+  'application/x-pdf',
+  'binary/octet-stream',
+];
+
 const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ALLOWED_PDF_MIMES.includes(file.mimetype) || ext === '.pdf') {
       cb(null, true);
     } else {
       cb(new Error('Only PDF files are allowed'));
@@ -26,7 +34,14 @@ const upload = multer({
 
 const router = Router();
 
-router.post('/', authenticateToken, upload.single('certification') as any, async (req: AuthRequest, res: Response) => {
+router.post('/', authenticateToken, (req: AuthRequest, res: Response, next: any) => {
+  upload.single('certification')(req as any, res as any, (err: any) => {
+    if (err) {
+      return res.status(400).json({ error: err.message || 'File upload failed' });
+    }
+    next();
+  });
+}, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const { specialty, experience, bio } = req.body;

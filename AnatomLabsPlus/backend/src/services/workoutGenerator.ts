@@ -21,7 +21,7 @@ import {
 } from './workoutFilter';
 
 export interface WorkoutGenerationParams {
-  goal: 'muscle_gain' | 'fat_loss' | 'endurance' | 'general_fitness' | 'sport_specific';
+  goal: 'muscle_gain' | 'fat_loss' | 'body_recomposition' | 'endurance' | 'general_fitness' | 'sport_specific';
   experienceLevel: 'beginner' | 'intermediate' | 'advanced';
   daysPerWeek: number; // 2-6 days
   sport?: 'football' | 'basketball' | 'volleyball' | 'boxing' | 'swimming' | null;

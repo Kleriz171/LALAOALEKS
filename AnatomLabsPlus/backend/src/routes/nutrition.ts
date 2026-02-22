@@ -26,11 +26,14 @@ router.post('/calculate', authenticateToken, async (req: AuthRequest, res: Respo
       return res.status(404).json({ error: 'User not found' });
     }
 
-    if (!user.age || !user.gender || !user.weight || !user.height || !user.activityLevel || !user.goal) {
+    if (!user.age || !user.gender || !user.weight || !user.height || !user.activityLevel) {
       return res.status(400).json({
-        error: 'Please complete your profile (age, gender, weight, height, activityLevel, goal) to calculate nutrition targets'
+        error: 'Please complete your profile (age, gender, weight, height, activity level) to calculate nutrition targets'
       });
     }
+
+    const validGoals = ['muscle_gain', 'fat_loss', 'body_recomposition', 'endurance', 'general_fitness', 'sport_specific'];
+    const fitnessGoal = validGoals.includes(user.goal ?? '') ? user.goal! : 'general_fitness';
 
     const physicalData: UserPhysicalData = {
       age: user.age,
@@ -38,7 +41,7 @@ router.post('/calculate', authenticateToken, async (req: AuthRequest, res: Respo
       weight: user.weight,
       height: user.height,
       activityLevel: user.activityLevel as any,
-      fitnessGoal: user.goal as any
+      fitnessGoal: fitnessGoal as any
     };
 
     // Build health profile from user data
@@ -191,19 +194,21 @@ router.get('/logs/today', authenticateToken, async (req: AuthRequest, res: Respo
 
     let remaining = null;
     let healthAdjustments = null;
-    if (user?.age && user?.gender && user?.weight && user?.height && user?.activityLevel && user?.goal) {
+    const validGoals = ['muscle_gain', 'fat_loss', 'body_recomposition', 'endurance', 'general_fitness', 'sport_specific'];
+    if (user?.age && user?.gender && user?.weight && user?.height && user?.activityLevel) {
       const healthProfile: UserHealthProfile = {
         medicalConditions: user.healthConditions as string[] || [],
         dietaryPreferences: user.dietaryPreferences as string[] || []
       };
 
+      const fitnessGoal = validGoals.includes(user.goal ?? '') ? user.goal! : 'general_fitness';
       const targets = calculateHealthAwareNutritionPlan({
         age: user.age,
         gender: user.gender as 'male' | 'female',
         weight: user.weight,
         height: user.height,
         activityLevel: user.activityLevel as any,
-        fitnessGoal: user.goal as any
+        fitnessGoal: fitnessGoal as any
       }, healthProfile);
 
       remaining = {
@@ -272,20 +277,22 @@ router.get('/logs/history', authenticateToken, async (req: AuthRequest, res: Res
       where: { id: userId }
     });
 
-    let targetCalories = 2000; // default
-    if (user?.age && user?.gender && user?.weight && user?.height && user?.activityLevel && user?.goal) {
+    const validGoalsHist = ['muscle_gain', 'fat_loss', 'body_recomposition', 'endurance', 'general_fitness', 'sport_specific'];
+    let targetCalories = 2000;
+    if (user?.age && user?.gender && user?.weight && user?.height && user?.activityLevel) {
       const healthProfile: UserHealthProfile = {
         medicalConditions: user.healthConditions as string[] || [],
         dietaryPreferences: user.dietaryPreferences as string[] || []
       };
 
+      const fitnessGoal = validGoalsHist.includes(user.goal ?? '') ? user.goal! : 'general_fitness';
       const targets = calculateHealthAwareNutritionPlan({
         age: user.age,
         gender: user.gender as 'male' | 'female',
         weight: user.weight,
         height: user.height,
         activityLevel: user.activityLevel as any,
-        fitnessGoal: user.goal as any
+        fitnessGoal: fitnessGoal as any
       }, healthProfile);
       targetCalories = targets.targetCalories;
     }
@@ -585,7 +592,7 @@ router.get('/suggestions', authenticateToken, async (req: AuthRequest, res: Resp
       where: { id: userId }
     });
 
-    if (!user?.age || !user?.gender || !user?.weight || !user?.height || !user?.activityLevel || !user?.goal) {
+    if (!user?.age || !user?.gender || !user?.weight || !user?.height || !user?.activityLevel) {
       return res.status(400).json({
         error: 'Please complete your profile to get suggestions'
       });
@@ -596,13 +603,15 @@ router.get('/suggestions', authenticateToken, async (req: AuthRequest, res: Resp
       dietaryPreferences: user.dietaryPreferences as string[] || []
     };
 
+    const validGoalsSug = ['muscle_gain', 'fat_loss', 'body_recomposition', 'endurance', 'general_fitness', 'sport_specific'];
+    const fitnessGoalSug = validGoalsSug.includes(user.goal ?? '') ? user.goal! : 'general_fitness';
     const targets = calculateHealthAwareNutritionPlan({
       age: user.age,
       gender: user.gender as 'male' | 'female',
       weight: user.weight,
       height: user.height,
       activityLevel: user.activityLevel as any,
-      fitnessGoal: user.goal as any
+      fitnessGoal: fitnessGoalSug as any
     }, healthProfile);
 
     const remaining = {

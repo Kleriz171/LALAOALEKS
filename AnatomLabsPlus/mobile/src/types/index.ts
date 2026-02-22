@@ -7,7 +7,7 @@ export interface User {
   gender: 'male' | 'female';
   weight: number; // kg
   height: number; // cm
-  goal: 'muscle_gain' | 'fat_loss' | 'maintenance' | 'endurance' | 'strength';
+  goal: 'muscle_gain' | 'fat_loss' | 'body_recomposition' | 'general_fitness' | 'endurance' | 'sport_specific' | 'maintenance' | 'strength' | string;
   experienceLevel: 'beginner' | 'intermediate' | 'advanced';
   activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
   bmi?: number;
@@ -157,7 +157,7 @@ export interface WorkoutDay {
 }
 
 export interface GenerateWorkoutRequest {
-  goal: 'muscle_gain' | 'fat_loss' | 'strength' | 'endurance' | 'sport_specific';
+  goal: 'muscle_gain' | 'fat_loss' | 'body_recomposition' | 'strength' | 'endurance' | 'sport_specific';
   experienceLevel: 'beginner' | 'intermediate' | 'advanced';
   frequency: number; // 2-6 days per week
   availableEquipment: string[];
@@ -191,9 +191,12 @@ export interface MacroTargets {
   protein: number; // grams
   carbs: number;
   fat: number;
-  proteinCalories: number;
-  carbsCalories: number;
-  fatCalories: number;
+  proteinCalories?: number;
+  carbsCalories?: number;
+  fatCalories?: number;
+  proteinPercentage?: number;
+  carbsPercentage?: number;
+  fatPercentage?: number;
 }
 
 export interface NutritionCalculation {
