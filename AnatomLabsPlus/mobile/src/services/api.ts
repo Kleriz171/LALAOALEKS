@@ -40,6 +40,7 @@ import {
   ShareableReport,
   TrainingHeatmapDay,
   Coach,
+  CoachReview,
   CoachApplication,
   Booking,
   Conversation,
@@ -1025,6 +1026,15 @@ class ApiService {
     const response = await this.api.get<Coach>(`/coaches/${id}`);
     const c = response.data;
     return { ...c, avatar: resolveUrl(c.avatar) };
+  }
+
+  async submitCoachReview(coachId: string, rating: number, comment?: string): Promise<CoachReview> {
+    const response = await this.api.post<CoachReview>(`/coaches/${coachId}/reviews`, { rating, comment });
+    return response.data;
+  }
+
+  async deleteCoachReview(coachId: string): Promise<void> {
+    await this.api.delete(`/coaches/${coachId}/reviews`);
   }
 
   async followCoach(id: string): Promise<{ message: string }> {

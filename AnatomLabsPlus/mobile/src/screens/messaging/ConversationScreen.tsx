@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, Easing } from 'react-native-reanimated';
 import { ChatMessage } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
@@ -23,6 +24,25 @@ import { COLORS, FadeIn, AnimatedListItem } from '../../components/animations';
 function getInitials(name: string): string {
   if (!name) return '??';
   return name.split(' ').map(n => n[0]).join('').toUpperCase();
+}
+
+function AnimatedBubble({ children }: { children: React.ReactNode }) {
+  const translateY = useSharedValue(14);
+  const opacity = useSharedValue(0);
+  const scale = useSharedValue(0.95);
+
+  useEffect(() => {
+    translateY.value = withTiming(0, { duration: 280, easing: Easing.out(Easing.exp) });
+    opacity.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.quad) });
+    scale.value = withSpring(1, { damping: 18, stiffness: 260 });
+  }, []);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }, { scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
+  return <Animated.View style={style}>{children}</Animated.View>;
 }
 
 export default function ConversationScreen() {
@@ -81,9 +101,10 @@ export default function ConversationScreen() {
 
   const renderMessage = ({ item, index }: { item: ChatMessage; index: number }) => {
     const isMine = item.senderId === user?.id;
-    const showAvatar = !isMine && (index === 0 || messages[index-1].senderId !== item.senderId);
-    
-    return (
+    const showAvatar = !isMine && (index === 0 || messages[index - 1].senderId !== item.senderId);
+    const isNewest = index === messages.length - 1;
+
+    const content = (
       <View style={[styles.messageRow, isMine ? styles.myRow : styles.theirRow]}>
         {!isMine && (
           <View style={styles.avatarSpace}>
@@ -98,7 +119,6 @@ export default function ConversationScreen() {
             )}
           </View>
         )}
-        
         <View style={[styles.bubbleContainer, isMine ? styles.myContainer : styles.theirContainer]}>
           <View style={[styles.bubble, isMine ? styles.myBubble : styles.theirBubble]}>
             <Text style={[styles.messageText, isMine && styles.myMessageText]}>{item.content}</Text>
@@ -107,6 +127,12 @@ export default function ConversationScreen() {
         </View>
       </View>
     );
+
+    if (isMine && isNewest) {
+      return <AnimatedBubble key={item.id}>{content}</AnimatedBubble>;
+    }
+
+    return content;
   };
 
   if (loading && messages.length === 0) {

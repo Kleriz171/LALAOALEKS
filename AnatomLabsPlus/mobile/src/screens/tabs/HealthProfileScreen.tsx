@@ -14,7 +14,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown, ZoomIn } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, SlideOutDown, ZoomIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
@@ -412,7 +412,7 @@ export default function HealthProfileScreen({ navigation }: any) {
       {/* Save Button */}
       {hasChanges && (
         <Animated.View
-          entering={SlideInDown.springify().damping(15)}
+          entering={FadeIn.duration(200)}
           exiting={SlideOutDown.duration(200)}
           style={styles.saveContainer}
         >

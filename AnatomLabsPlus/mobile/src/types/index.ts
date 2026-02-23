@@ -865,6 +865,17 @@ export interface CoachPost {
   timestamp: string;
 }
 
+export interface CoachReview {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  rating: number;
+  comment?: string;
+  timestamp: string;
+  isOwn?: boolean;
+}
+
 export interface Coach {
   id: string;
   userId?: string;
@@ -884,6 +895,8 @@ export interface Coach {
   availability?: string[];
   stories?: CoachStory[];
   posts?: CoachPost[];
+  reviews?: CoachReview[];
+  myReview?: CoachReview | null;
   followerCount?: number;
   followingCount?: number;
   isFollowing?: boolean;

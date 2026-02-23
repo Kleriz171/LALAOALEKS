@@ -70,6 +70,7 @@ model User {
   follows          Follow[]
   postLikes        CoachPostLike[]
   postComments     CoachPostComment[]
+  coachReviews     CoachReview[]
   notifications    Notification[]
 
   @@map("users")
@@ -631,8 +632,25 @@ model CoachProfile {
   posts         CoachPost[]
   stories       CoachStory[]
   followers     Follow[]      @relation("CoachFollowers")
+  reviews       CoachReview[]
 
   @@map("coach_profiles")
+}
+
+model CoachReview {
+  id             String   @id @default(uuid())
+  coachProfileId String
+  userId         String
+  rating         Int
+  comment        String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  coachProfile   CoachProfile @relation(fields: [coachProfileId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([coachProfileId, userId])
+  @@map("coach_reviews")
 }
 
 model Follow {

@@ -110,7 +110,7 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response) =>
       where: { id },
       include: {
         user: { select: { id: true, name: true, email: true } },
-        posts: { 
+        posts: {
           orderBy: { createdAt: 'desc' },
           include: {
             likes: currentUserId ? { where: { userId: currentUserId } } : false,
@@ -125,6 +125,10 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response) =>
           orderBy: { createdAt: 'desc' },
         },
         followers: currentUserId ? { where: { userId: currentUserId } } : false,
+        reviews: {
+          orderBy: { createdAt: 'desc' },
+          include: { user: { select: { id: true, name: true, avatar: true } } },
+        },
       },
     });
 
@@ -174,6 +178,17 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response) =>
         })),
         timestamp: post.createdAt.toISOString(),
       })),
+      reviews: profile.reviews.map(r => ({
+        id: r.id,
+        userId: r.userId,
+        userName: r.user.name,
+        userAvatar: (r.user as any).avatar ?? null,
+        rating: r.rating,
+        comment: r.comment,
+        timestamp: r.createdAt.toISOString(),
+        isOwn: r.userId === currentUserId,
+      })),
+      myReview: profile.reviews.find(r => r.userId === currentUserId) ?? null,
     };
 
     res.json(coach);
@@ -353,6 +368,85 @@ router.post('/posts/:postId/comment', authenticateToken, async (req: AuthRequest
     res.json(comment);
   } catch (error) {
     res.status(500).json({ error: 'Failed to comment' });
+  }
+});
+
+router.post('/:id/reviews', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.userId!;
+    const { rating, comment } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+    }
+
+    const profile = await prisma.coachProfile.findUnique({ where: { id } });
+    if (!profile) return res.status(404).json({ error: 'Coach not found' });
+    if (profile.userId === userId) return res.status(400).json({ error: 'You cannot review yourself' });
+
+    const existing = await prisma.coachReview.findUnique({
+      where: { coachProfileId_userId: { coachProfileId: id, userId } },
+    });
+
+    let review;
+    if (existing) {
+      review = await prisma.coachReview.update({
+        where: { id: existing.id },
+        data: { rating, comment: comment || null },
+        include: { user: { select: { id: true, name: true, avatar: true } } },
+      });
+    } else {
+      review = await prisma.coachReview.create({
+        data: { coachProfileId: id, userId, rating, comment: comment || null },
+        include: { user: { select: { id: true, name: true, avatar: true } } },
+      });
+    }
+
+    const allReviews = await prisma.coachReview.findMany({ where: { coachProfileId: id } });
+    const avg = allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
+    await prisma.coachProfile.update({
+      where: { id },
+      data: { rating: Math.round(avg * 10) / 10, reviewCount: allReviews.length },
+    });
+
+    res.json({
+      id: review.id,
+      userId: review.userId,
+      userName: review.user.name,
+      userAvatar: (review.user as any).avatar ?? null,
+      rating: review.rating,
+      comment: review.comment,
+      timestamp: review.createdAt.toISOString(),
+      isOwn: true,
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to submit review' });
+  }
+});
+
+router.delete('/:id/reviews', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.userId!;
+
+    const review = await prisma.coachReview.findUnique({
+      where: { coachProfileId_userId: { coachProfileId: id, userId } },
+    });
+    if (!review) return res.status(404).json({ error: 'Review not found' });
+
+    await prisma.coachReview.delete({ where: { id: review.id } });
+
+    const allReviews = await prisma.coachReview.findMany({ where: { coachProfileId: id } });
+    const avg = allReviews.length > 0 ? allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length : 0;
+    await prisma.coachProfile.update({
+      where: { id },
+      data: { rating: Math.round(avg * 10) / 10, reviewCount: allReviews.length },
+    });
+
+    res.json({ message: 'Review deleted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete review' });
   }
 });
 

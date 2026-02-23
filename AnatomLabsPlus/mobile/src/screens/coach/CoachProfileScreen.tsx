@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity,
   Dimensions, ActivityIndicator, StatusBar, Alert,
-  Modal, TextInput, Platform,
+  Modal, TextInput, Platform, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,12 +11,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import Animated, {
   useSharedValue, useAnimatedScrollHandler, useAnimatedStyle,
-  interpolate, Extrapolation, SlideInRight, FadeInDown, FadeInUp,
-  ZoomIn, withSpring,
+  interpolate, Extrapolation, SlideInRight, FadeInDown,
+  ZoomIn, withSpring, withSequence, withTiming,
 } from 'react-native-reanimated';
 import api from '../../services/api';
-import { Coach } from '../../types';
-import { useHaptics, FadeIn, SlideIn, GlassCard, ScaleIn, AnimatedListItem } from '../../components/animations';
+import { Coach, CoachPost, CoachReview } from '../../types';
+import { useHaptics, FadeIn, SlideIn } from '../../components/animations';
 import { COLORS } from '../../components/animations/config';
 
 const { width: SW } = Dimensions.get('window');
@@ -27,57 +27,14 @@ const TEXT = COLORS.text;
 const TEXT2 = COLORS.textSecondary;
 const TEXT3 = COLORS.textTertiary;
 const ACCENT = COLORS.primary;
+const COVER_H = 200;
+const AVATAR_SIZE = 80;
 
-const IC = ['#e74c3c', '#3498db', '#2ecc71', '#9b59b6', '#f39c12', '#1abc9c'];
 const SLOTS = ['Morning (6–9 AM)', 'Late Morning (9–12 PM)', 'Afternoon (12–3 PM)', 'Late Afternoon (3–6 PM)', 'Evening (6–9 PM)'];
 
 function initials(name: string) {
   if (!name) return '??';
-  return name.split(' ').map(n => n[0]).join('').toUpperCase();
-}
-
-function PressBtn({ style, onPress, disabled, children, delay }: any) {
-  const scale = useSharedValue(1);
-  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  return (
-    <Animated.View entering={FadeInDown.delay(delay).duration(400)}>
-      <Animated.View style={animStyle}>
-        <TouchableOpacity
-          style={style}
-          onPress={onPress}
-          disabled={disabled}
-          activeOpacity={1}
-          onPressIn={() => { scale.value = withSpring(0.95, { damping: 15, stiffness: 300 }); }}
-          onPressOut={() => { scale.value = withSpring(1, { damping: 12, stiffness: 300 }); }}
-        >
-          {children}
-        </TouchableOpacity>
-      </Animated.View>
-    </Animated.View>
-  );
-}
-
-function StatItem({ v, l, delay, isLast }: any) {
-  const scale = useSharedValue(1);
-  const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  return (
-    <React.Fragment>
-      <Animated.View entering={ZoomIn.delay(delay).duration(350).springify()} style={s.stat}>
-        <Animated.View style={[anim, { width: '100%', alignItems: 'center' }]}>
-          <TouchableOpacity
-            activeOpacity={1}
-            onPressIn={() => { scale.value = withSpring(0.92, { damping: 12, stiffness: 280 }); }}
-            onPressOut={() => { scale.value = withSpring(1, { damping: 12, stiffness: 280 }); }}
-            style={{ alignItems: 'center', width: '100%' }}
-          >
-            <Text style={s.statV}>{v}</Text>
-            <Text style={s.statL}>{l}</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </Animated.View>
-      {!isLast && <View style={s.statDiv} />}
-    </React.Fragment>
-  );
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 }
 
 function fmt(n: number) {
@@ -86,28 +43,159 @@ function fmt(n: number) {
   return String(n);
 }
 
+function timeAgo(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d ago`;
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function StarRating({ value, size = 16, onSelect }: { value: number; size?: number; onSelect?: (n: number) => void }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 3 }}>
+      {[1, 2, 3, 4, 5].map(n => (
+        <TouchableOpacity key={n} onPress={() => onSelect?.(n)} disabled={!onSelect} activeOpacity={0.7}>
+          <Ionicons name={n <= value ? 'star' : 'star-outline'} size={size} color={n <= value ? '#f39c12' : TEXT3} />
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
+function PostCard({ post, coachName, coachAvatar }: { post: CoachPost; coachName: string; coachAvatar?: string }) {
+  const [liked, setLiked] = useState(post.isLiked || false);
+  const [likes, setLikes] = useState(post.likes);
+  const [showComments, setShowComments] = useState(false);
+
+  const handleLike = async () => {
+    setLiked(l => !l);
+    setLikes(n => liked ? n - 1 : n + 1);
+    try {
+      await api.likePost(post.id);
+    } catch {
+      setLiked(l => !l);
+      setLikes(n => liked ? n + 1 : n - 1);
+    }
+  };
+
+  return (
+    <View style={p.card}>
+      <View style={p.header}>
+        <View style={p.avatar}>
+          {coachAvatar
+            ? <Image source={{ uri: coachAvatar }} style={p.avatarImg} />
+            : <LinearGradient colors={[ACCENT, COLORS.primaryDark]} style={p.avatarImg}>
+                <Text style={p.avatarText}>{initials(coachName)}</Text>
+              </LinearGradient>
+          }
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={p.authorName}>{coachName}</Text>
+          <Text style={p.timestamp}>{timeAgo(post.timestamp)}</Text>
+        </View>
+      </View>
+
+      {!!post.caption && <Text style={p.caption}>{post.caption}</Text>}
+
+      {!!post.imageUrl && (
+        <Image source={{ uri: post.imageUrl }} style={p.image} resizeMode="cover" />
+      )}
+
+      <View style={p.actions}>
+        <TouchableOpacity style={p.action} onPress={handleLike} activeOpacity={0.7}>
+          <Ionicons name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? ACCENT : TEXT2} />
+          {likes > 0 && <Text style={[p.actionText, liked && { color: ACCENT }]}>{likes}</Text>}
+        </TouchableOpacity>
+        <TouchableOpacity style={p.action} onPress={() => setShowComments(v => !v)} activeOpacity={0.7}>
+          <Ionicons name="chatbubble-outline" size={18} color={TEXT2} />
+          {post.comments > 0 && <Text style={p.actionText}>{post.comments}</Text>}
+        </TouchableOpacity>
+      </View>
+
+      {showComments && (post.recentComments || []).length > 0 && (
+        <View style={p.comments}>
+          {(post.recentComments || []).map(c => (
+            <View key={c.id} style={p.comment}>
+              <Text style={p.commentName}>{c.userName}</Text>
+              <Text style={p.commentText}>{c.content}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function ReviewCard({ review, onDelete }: { review: CoachReview; onDelete?: () => void }) {
+  return (
+    <View style={rv.card}>
+      <View style={rv.header}>
+        <View style={rv.avatar}>
+          {review.userAvatar
+            ? <Image source={{ uri: review.userAvatar }} style={rv.avatarImg} />
+            : <View style={rv.avatarFallback}><Text style={rv.avatarText}>{review.userName[0]?.toUpperCase()}</Text></View>
+          }
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={rv.name}>{review.userName}</Text>
+          <StarRating value={review.rating} size={12} />
+        </View>
+        <Text style={rv.time}>{timeAgo(review.timestamp)}</Text>
+        {review.isOwn && onDelete && (
+          <TouchableOpacity onPress={onDelete} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="trash-outline" size={15} color={TEXT3} />
+          </TouchableOpacity>
+        )}
+      </View>
+      {!!review.comment && <Text style={rv.comment}>{review.comment}</Text>}
+    </View>
+  );
+}
+
 export default function CoachProfileScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const { trigger } = useHaptics();
   const { coachId } = route.params;
   const scrollY = useSharedValue(0);
+  const followScale = useSharedValue(1);
+  const msgY = useSharedValue(0);
+  const msgOpacity = useSharedValue(1);
+
+  const followAnimStyle = useAnimatedStyle(() => ({ transform: [{ scale: followScale.value }] }));
+  const msgAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: msgY.value }],
+    opacity: msgOpacity.value,
+  }));
 
   const [coach, setCoach] = useState<Coach | null>(null);
   const [loading, setLoading] = useState(true);
   const [followLoading, setFollowLoading] = useState(false);
   const [bookVisible, setBookVisible] = useState(false);
+  const [reviewVisible, setReviewVisible] = useState(false);
   const [slot, setSlot] = useState('');
   const [goal, setGoal] = useState('');
   const [bookDate, setBookDate] = useState<Date>(new Date());
   const [bookSubmitting, setBookSubmitting] = useState(false);
   const [msgLoading, setMsgLoading] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
   const loadProfile = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.getCoachProfile(coachId);
       setCoach(data);
+      if (data.myReview) {
+        setReviewRating(data.myReview.rating);
+        setReviewComment(data.myReview.comment || '');
+      }
     } catch {
       Alert.alert('Error', 'Failed to load coach profile');
     } finally {
@@ -119,18 +207,22 @@ export default function CoachProfileScreen() {
 
   const onScroll = useAnimatedScrollHandler(e => { scrollY.value = e.contentOffset.y; });
 
-  const heroScale = useAnimatedStyle(() => ({
-    transform: [{ scale: interpolate(scrollY.value, [-60, 0], [1.06, 1], Extrapolation.CLAMP) }],
+  const coverParallax = useAnimatedStyle(() => ({
+    transform: [{ translateY: interpolate(scrollY.value, [0, COVER_H], [0, COVER_H * 0.4], Extrapolation.CLAMP) }],
   }));
 
   const navOpacity = useAnimatedStyle(() => ({
-    opacity: interpolate(scrollY.value, [60, 120], [0, 1], Extrapolation.CLAMP),
+    opacity: interpolate(scrollY.value, [COVER_H - 60, COVER_H], [0, 1], Extrapolation.CLAMP),
   }));
 
   const toggleFollow = async () => {
     if (!coach || followLoading) return;
     setFollowLoading(true);
     trigger('light');
+    followScale.value = withSequence(
+      withTiming(0.95, { duration: 120 }),
+      withTiming(1, { duration: 250 })
+    );
     try {
       if (coach.isFollowing) {
         await api.unfollowCoach(coach.id);
@@ -150,6 +242,14 @@ export default function CoachProfileScreen() {
     if (!coach?.userId || msgLoading) return;
     setMsgLoading(true);
     trigger('medium');
+    msgY.value = withSequence(
+      withTiming(-6, { duration: 120 }),
+      withTiming(0, { duration: 200 })
+    );
+    msgOpacity.value = withSequence(
+      withTiming(0.4, { duration: 120 }),
+      withTiming(1, { duration: 200 })
+    );
     try {
       const { conversation } = await api.getOrCreateConversation(coach.userId);
       navigation.navigate('Conversation', {
@@ -182,13 +282,56 @@ export default function CoachProfileScreen() {
     }
   };
 
+  const handleSubmitReview = async () => {
+    if (!coach || reviewRating === 0) return;
+    setReviewSubmitting(true);
+    trigger('medium');
+    try {
+      const review = await api.submitCoachReview(coach.id, reviewRating, reviewComment || undefined);
+      setCoach(prev => {
+        if (!prev) return prev;
+        const existing = prev.reviews?.find(r => r.isOwn);
+        const reviews = existing
+          ? (prev.reviews || []).map(r => r.isOwn ? review : r)
+          : [review, ...(prev.reviews || [])];
+        return { ...prev, reviews, myReview: review };
+      });
+      setReviewVisible(false);
+    } catch {
+      Alert.alert('Error', 'Failed to submit review');
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const handleDeleteReview = async () => {
+    if (!coach) return;
+    Alert.alert('Delete Review', 'Remove your review?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            await api.deleteCoachReview(coach.id);
+            setCoach(prev => prev ? {
+              ...prev,
+              reviews: (prev.reviews || []).filter(r => !r.isOwn),
+              myReview: null,
+            } : prev);
+            setReviewRating(0);
+            setReviewComment('');
+          } catch {
+            Alert.alert('Error', 'Failed to delete review');
+          }
+        }
+      },
+    ]);
+  };
+
   if (loading) {
     return (
       <View style={s.center}>
         <StatusBar barStyle="light-content" />
-        <Animated.View entering={ZoomIn.duration(500).springify()}>
-          <ActivityIndicator size="large" color={ACCENT} />
-        </Animated.View>
+        <ActivityIndicator size="large" color={ACCENT} />
       </View>
     );
   }
@@ -197,24 +340,31 @@ export default function CoachProfileScreen() {
     return (
       <View style={s.center}>
         <StatusBar barStyle="light-content" />
-        <Text style={{ color: TEXT }}>Coach not found</Text>
+        <Text style={{ color: TEXT2 }}>Coach not found</Text>
       </View>
     );
   }
+
+  const posts = coach.posts || [];
+  const reviews = coach.reviews || [];
 
   return (
     <View style={s.root}>
       <StatusBar barStyle="light-content" />
 
-      <Animated.View style={[s.floatNav, navOpacity]}>
-        <BlurView intensity={60} tint="dark" style={s.floatNavBlur}>
-          <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={22} color={TEXT} />
-          </TouchableOpacity>
+      <Animated.View style={[s.floatNav, navOpacity]} pointerEvents="none">
+        <BlurView intensity={80} tint="dark" style={s.floatNavBlur}>
           <Text style={s.floatNavTitle}>{coach.name}</Text>
-          <View style={{ width: 44 }} />
         </BlurView>
       </Animated.View>
+
+      <SafeAreaView style={s.backRow} edges={['top']}>
+        <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>
+          <BlurView intensity={50} tint="dark" style={s.backBlur}>
+            <Ionicons name="chevron-back" size={20} color={TEXT} />
+          </BlurView>
+        </TouchableOpacity>
+      </SafeAreaView>
 
       <Animated.ScrollView
         onScroll={onScroll}
@@ -222,177 +372,255 @@ export default function CoachProfileScreen() {
         showsVerticalScrollIndicator={false}
         bounces
       >
-        <Animated.View style={[s.hero, heroScale]}>
-          <LinearGradient colors={['#1a1a1a', '#111', BG]} style={StyleSheet.absoluteFill} />
-          {coach.avatar && (
-            <Image source={{ uri: coach.avatar }} style={s.heroBg} blurRadius={40} />
+        <Animated.View style={[s.cover, coverParallax]}>
+          {coach.avatar ? (
+            <Image source={{ uri: coach.avatar }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          ) : (
+            <LinearGradient colors={['#1c1c1e', '#111']} style={StyleSheet.absoluteFill} />
           )}
-          <LinearGradient colors={['rgba(8,8,16,0.55)', BG]} style={StyleSheet.absoluteFill} />
-
-          <SafeAreaView style={s.navRow}>
-            <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>
-              <BlurView intensity={40} tint="dark" style={s.backBlur}>
-                <Ionicons name="chevron-back" size={22} color={TEXT} />
-              </BlurView>
-            </TouchableOpacity>
-          </SafeAreaView>
-
-          <ScaleIn delay={100}>
-            <View style={s.avatarWrap}>
-              {coach.avatar ? (
-                <Image source={{ uri: coach.avatar }} style={s.avatarImg} />
-              ) : (
-                <LinearGradient colors={[IC[0], `${IC[0]}88`]} style={s.avatarFallback}>
-                  <Text style={s.avatarInitials}>{initials(coach.name)}</Text>
-                </LinearGradient>
-              )}
-              {coach.verified && (
-                <View style={s.verifiedBadge}>
-                  <Ionicons name="checkmark" size={11} color="#fff" />
-                </View>
-              )}
-            </View>
-          </ScaleIn>
+          <LinearGradient
+            colors={['rgba(10,10,10,0)', 'rgba(10,10,10,0.5)', BG]}
+            style={StyleSheet.absoluteFill}
+          />
         </Animated.View>
 
-        <View style={s.body}>
-          <Animated.Text entering={FadeInDown.delay(200).duration(400)} style={s.name}>{coach.name}</Animated.Text>
-          <Animated.Text entering={FadeInDown.delay(280).duration(400)} style={s.bio}>{coach.bio}</Animated.Text>
-
-          <GlassCard delay={320} style={s.statRow} contentStyle={s.statRowContent}>
-            {[
-              { v: fmt(coach.followerCount || 0), l: 'Followers' },
-              { v: String(coach.posts?.length || 0), l: 'Posts' },
-              { v: String(coach.clientCount || 0), l: 'Clients' },
-              { v: String(coach.rating), l: 'Rating' },
-            ].map((st, i, arr) => (
-              <StatItem key={st.l} {...st} delay={360 + i * 70} isLast={i === arr.length - 1} />
-            ))}
-          </GlassCard>
-
-          <View style={s.tags}>
-            {coach.specialty.map((sp, i) => (
-              <Animated.View key={i} entering={ZoomIn.delay(450 + i * 50).duration(300).springify()}>
-                <View style={s.tag}><Text style={s.tagText}>{sp}</Text></View>
-              </Animated.View>
-            ))}
-          </View>
-
-          <View style={s.actions}>
-            <PressBtn
-              style={[s.followBtn, coach.isFollowing && s.followingBtn, { flex: 2 }]}
-              onPress={toggleFollow}
-              disabled={followLoading}
-              delay={550}
-            >
-              {followLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  {coach.isFollowing && <Ionicons name="checkmark" size={15} color={TEXT2} />}
-                  <Text style={[s.followBtnText, coach.isFollowing && { color: TEXT2 }]}>
-                    {coach.isFollowing ? 'Following' : 'Follow'}
-                  </Text>
-                </>
-              )}
-            </PressBtn>
-            <PressBtn style={[s.secBtn, { flex: 1 }]} onPress={handleMessage} disabled={msgLoading} delay={620}>
-              {msgLoading ? <ActivityIndicator size="small" color={TEXT} /> : <Ionicons name="chatbubble-outline" size={18} color={TEXT} />}
-            </PressBtn>
-            <PressBtn style={[s.secBtn, { flex: 1 }]} onPress={() => setBookVisible(true)} disabled={false} delay={690}>
-              <Ionicons name="calendar-outline" size={18} color={TEXT} />
-            </PressBtn>
-          </View>
-
-          <View style={s.metaRow}>
-            {[
-              { icon: 'briefcase', color: '#3498db', val: `${coach.experience} yrs`, bg: 'rgba(52,152,219,0.1)' },
-              { icon: 'people', color: '#2ecc71', val: `${coach.clientCount} clients`, bg: 'rgba(46,204,113,0.1)' },
-              { icon: 'cash', color: '#f39c12', val: coach.price, bg: 'rgba(243,156,18,0.1)' },
-            ].map((m, i) => (
-              <Animated.View key={m.icon} entering={FadeInDown.delay(720 + i * 80).duration(400)} style={[s.metaCard, { backgroundColor: m.bg }]}>
-                <Ionicons name={m.icon as any} size={16} color={m.color} />
-                <Text style={[s.metaVal, { color: m.color }]}>{m.val}</Text>
-              </Animated.View>
-            ))}
-          </View>
-
-          {(coach.posts || []).filter(p => p.imageUrl).length > 0 && (
-            <View>
-              <Animated.Text entering={FadeInDown.delay(850).duration(350)} style={s.gridLabel}>Posts</Animated.Text>
-              <View style={s.grid}>
-                {(coach.posts || []).filter(p => p.imageUrl).map((p, i) => (
-                  <Animated.View key={p.id} entering={ZoomIn.delay(900 + i * 50).duration(300).springify()}>
-                    <TouchableOpacity style={s.gridItem} activeOpacity={0.9}>
-                      <Image source={{ uri: p.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.35)']} style={StyleSheet.absoluteFill} />
-                    </TouchableOpacity>
-                  </Animated.View>
-                ))}
+        <View style={s.profileRow}>
+          <View style={s.avatarWrap}>
+            {coach.avatar ? (
+              <Image source={{ uri: coach.avatar }} style={s.avatarImg} />
+            ) : (
+              <LinearGradient colors={[ACCENT, COLORS.primaryDark]} style={s.avatarFallback}>
+                <Text style={s.avatarInitials}>{initials(coach.name)}</Text>
+              </LinearGradient>
+            )}
+            {coach.verified && (
+              <View style={s.verifiedBadge}>
+                <Ionicons name="checkmark" size={10} color="#fff" />
               </View>
+            )}
+          </View>
+
+          <View style={s.profileActions}>
+            <TouchableOpacity style={s.bookBtn} onPress={() => setBookVisible(true)} activeOpacity={0.8}>
+              <Text style={s.bookBtnText}>Book Session</Text>
+            </TouchableOpacity>
+            <Animated.View style={msgAnimStyle}>
+              <TouchableOpacity style={s.iconBtn} onPress={handleMessage} disabled={msgLoading} activeOpacity={0.85}>
+                {msgLoading
+                  ? <ActivityIndicator size="small" color={TEXT} />
+                  : <Ionicons name="chatbubble-outline" size={19} color={TEXT} />}
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+        </View>
+
+        <View style={s.body}>
+          <Text style={s.name}>{coach.name}</Text>
+
+          {coach.specialty.length > 0 && (
+            <View style={s.specialtyRow}>
+              {coach.specialty.slice(0, 3).map((sp, i) => (
+                <Text key={i} style={s.specialty}>
+                  {sp}{i < Math.min(coach.specialty.length, 3) - 1 ? '  ·  ' : ''}
+                </Text>
+              ))}
             </View>
           )}
-          <View style={{ height: 100 }} />
+
+          {!!coach.bio && <Text style={s.bio}>{coach.bio}</Text>}
+
+          <View style={s.infoRow}>
+            {!!coach.experience && (
+              <View style={s.infoItem}>
+                <Ionicons name="briefcase-outline" size={13} color={TEXT3} />
+                <Text style={s.infoText}>{coach.experience} yrs experience</Text>
+              </View>
+            )}
+            {!!coach.price && (
+              <View style={s.infoItem}>
+                <Ionicons name="cash-outline" size={13} color={TEXT3} />
+                <Text style={s.infoText}>{coach.price}</Text>
+              </View>
+            )}
+          </View>
+
+          <Animated.View style={[{ alignSelf: 'flex-start' }, followAnimStyle]}>
+            <TouchableOpacity
+              style={[s.followBtn, coach.isFollowing && s.followingBtn, followLoading && { opacity: 0.6 }]}
+              onPress={toggleFollow}
+              disabled={followLoading}
+              activeOpacity={0.9}
+            >
+              <Text style={[s.followBtnText, coach.isFollowing && s.followingBtnText]}>
+                {coach.isFollowing ? 'Following' : 'Follow'}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+
+          <View style={s.divider} />
+
+          <View style={s.statsRow}>
+            {[
+              { v: fmt(coach.followerCount || 0), l: 'Followers' },
+              { v: fmt(coach.clientCount || 0), l: 'Clients' },
+              { v: String(posts.length), l: 'Posts' },
+              { v: coach.rating > 0 ? `${coach.rating}★` : '—', l: 'Rating' },
+            ].map(st => (
+              <View key={st.l} style={s.stat}>
+                <Text style={s.statV}>{st.v}</Text>
+                <Text style={s.statL}>{st.l}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={s.divider} />
+
+          {posts.length > 0 && (
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Posts</Text>
+              {posts.map(post => (
+                <PostCard key={post.id} post={post} coachName={coach.name} coachAvatar={coach.avatar} />
+              ))}
+            </View>
+          )}
+
+          <View style={s.divider} />
+
+          <View style={s.section}>
+            <View style={s.sectionHeader}>
+              <Text style={s.sectionTitle}>
+                Reviews {reviews.length > 0 ? `(${reviews.length})` : ''}
+              </Text>
+              <TouchableOpacity onPress={() => setReviewVisible(true)} activeOpacity={0.7}>
+                <Text style={s.writeReview}>
+                  {coach.myReview ? 'Edit review' : 'Write a review'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {reviews.length === 0 ? (
+              <Text style={s.emptyText}>No reviews yet. Be the first!</Text>
+            ) : (
+              reviews.map(r => (
+                <ReviewCard key={r.id} review={r} onDelete={r.isOwn ? handleDeleteReview : undefined} />
+              ))
+            )}
+          </View>
+
+          <View style={{ height: 60 }} />
         </View>
       </Animated.ScrollView>
 
       <Modal visible={bookVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setBookVisible(false)}>
         <View style={s.sheet}>
           <View style={s.sheetHandle} />
-          <SlideIn direction="up" delay={60}>
-            <Text style={s.sheetTitle}>Book with {coach.name}</Text>
-          </SlideIn>
+          <Text style={s.sheetTitle}>Book with {coach.name}</Text>
           <Animated.ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
             <Text style={s.sectionLabel}>Select Date</Text>
-            <View style={s.dateRow}>
-              {Array.from({ length: 7 }, (_, i) => {
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.dateRow}>
+              {Array.from({ length: 365 }, (_, i) => {
                 const d = new Date();
                 d.setDate(d.getDate() + i);
                 const isSelected = d.toDateString() === bookDate.toDateString();
                 const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
                 const dayNum = d.getDate();
+                const monthName = d.toLocaleDateString('en-US', { month: 'short' });
                 return (
                   <TouchableOpacity
                     key={i}
                     style={[s.dateBtn, isSelected && s.dateBtnOn]}
                     onPress={() => setBookDate(d)}
+                    activeOpacity={0.7}
                   >
                     <Text style={[s.dateBtnDay, isSelected && s.dateBtnDayOn]}>{dayName}</Text>
                     <Text style={[s.dateBtnNum, isSelected && s.dateBtnNumOn]}>{dayNum}</Text>
+                    <Text style={[s.dateBtnMonth, isSelected && s.dateBtnDayOn]}>{monthName}</Text>
                   </TouchableOpacity>
                 );
               })}
-            </View>
-            <Text style={[s.sectionLabel, { marginTop: 20 }]}>Select Time</Text>
+            </ScrollView>
+
+            <Text style={[s.sectionLabel, { marginTop: 24 }]}>Select Time</Text>
             {SLOTS.map((sl, i) => (
-              <Animated.View key={sl} entering={SlideInRight.delay(80 + i * 50).duration(300).springify()}>
-                <TouchableOpacity style={[s.slotBtn, slot === sl && s.slotBtnOn]} onPress={() => setSlot(sl)}>
-                  <View style={[s.slotDot, slot === sl && s.slotDotOn]} />
+              <Animated.View key={sl} entering={SlideInRight.delay(i * 40).duration(250)}>
+                <TouchableOpacity
+                  style={[s.slotBtn, slot === sl && s.slotBtnOn]}
+                  onPress={() => setSlot(sl)}
+                  activeOpacity={0.7}
+                >
                   <Text style={[s.slotText, slot === sl && s.slotTextOn]}>{sl}</Text>
-                  {slot === sl && <Ionicons name="checkmark-circle" size={18} color={ACCENT} />}
+                  {slot === sl && <Ionicons name="checkmark" size={16} color={ACCENT} />}
                 </TouchableOpacity>
               </Animated.View>
             ))}
-            <FadeIn delay={360}>
+
+            <FadeIn delay={200}>
+              <Text style={[s.sectionLabel, { marginTop: 24 }]}>Goal (optional)</Text>
               <TextInput
-                style={[s.sheetInput, { height: 100, marginTop: 16, textAlignVertical: 'top' }]}
-                placeholder="Describe your training goal..."
+                style={s.sheetInput}
+                placeholder="What do you want to work on?"
                 placeholderTextColor={TEXT3}
                 value={goal}
                 onChangeText={setGoal}
                 multiline
+                numberOfLines={3}
               />
               <TouchableOpacity
-                style={[s.sheetBtn, (!slot || bookSubmitting) && { opacity: 0.45 }]}
+                style={[s.sheetBtn, (!slot || bookSubmitting) && { opacity: 0.4 }]}
                 onPress={handleBooking}
                 disabled={!slot || bookSubmitting}
+                activeOpacity={0.8}
               >
-                <LinearGradient colors={[ACCENT, '#b03030']} style={s.sheetBtnGrad}>
-                  {bookSubmitting ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.sheetBtnText}>Request Session</Text>}
+                <LinearGradient colors={[ACCENT, COLORS.primaryDark]} style={s.sheetBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                  {bookSubmitting
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <Text style={s.sheetBtnText}>Request Session</Text>}
                 </LinearGradient>
               </TouchableOpacity>
             </FadeIn>
           </Animated.ScrollView>
+        </View>
+      </Modal>
+
+      <Modal visible={reviewVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setReviewVisible(false)}>
+        <View style={s.sheet}>
+          <View style={s.sheetHandle} />
+          <Text style={s.sheetTitle}>{coach.myReview ? 'Edit Your Review' : `Review ${coach.name}`}</Text>
+          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+            <Text style={s.sectionLabel}>Your Rating</Text>
+            <View style={{ marginBottom: 24 }}>
+              <StarRating value={reviewRating} size={32} onSelect={setReviewRating} />
+            </View>
+
+            <Text style={s.sectionLabel}>Comment (optional)</Text>
+            <TextInput
+              style={[s.sheetInput, { height: 110, textAlignVertical: 'top' }]}
+              placeholder="Share your experience with this coach..."
+              placeholderTextColor={TEXT3}
+              value={reviewComment}
+              onChangeText={setReviewComment}
+              multiline
+            />
+
+            <TouchableOpacity
+              style={[s.sheetBtn, (reviewRating === 0 || reviewSubmitting) && { opacity: 0.4 }, { marginTop: 20 }]}
+              onPress={handleSubmitReview}
+              disabled={reviewRating === 0 || reviewSubmitting}
+              activeOpacity={0.8}
+            >
+              <LinearGradient colors={[ACCENT, COLORS.primaryDark]} style={s.sheetBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                {reviewSubmitting
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={s.sheetBtnText}>{coach.myReview ? 'Update Review' : 'Submit Review'}</Text>}
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {coach.myReview && (
+              <TouchableOpacity style={s.deleteReviewBtn} onPress={handleDeleteReview}>
+                <Text style={s.deleteReviewText}>Delete my review</Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -402,61 +630,156 @@ export default function CoachProfileScreen() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: BG },
+
   floatNav: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100 },
-  floatNavBlur: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: Platform.OS === 'ios' ? 54 : 16, paddingBottom: 12, paddingHorizontal: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER, overflow: 'hidden' },
-  floatNavTitle: { fontSize: 17, fontWeight: '700', color: TEXT },
-  hero: { height: 310, justifyContent: 'flex-end', alignItems: 'center', overflow: 'hidden' },
-  heroBg: { ...StyleSheet.absoluteFillObject, opacity: 0.35 },
-  navRow: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
-  backBtn: { margin: 16, width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
-  backBlur: { width: 40, height: 40, borderRadius: 20, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: BORDER },
-  avatarWrap: { width: 108, height: 108, borderRadius: 54, overflow: 'hidden', borderWidth: 3.5, borderColor: BG, marginBottom: -54, zIndex: 5 },
+  floatNavBlur: {
+    paddingTop: Platform.OS === 'ios' ? 52 : 16,
+    paddingBottom: 12,
+    paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: BORDER,
+    overflow: 'hidden',
+  },
+  floatNavTitle: { fontSize: 16, fontWeight: '700', color: TEXT },
+
+  backRow: { position: 'absolute', top: 0, left: 0, zIndex: 101 },
+  backBtn: { margin: 12 },
+  backBlur: {
+    width: 36, height: 36, borderRadius: 18,
+    overflow: 'hidden', justifyContent: 'center', alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.15)',
+  },
+
+  cover: { height: COVER_H, width: SW, overflow: 'hidden' },
+
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginTop: -(AVATAR_SIZE / 2),
+    marginBottom: 12,
+  },
+  avatarWrap: {
+    width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2,
+    overflow: 'hidden', borderWidth: 3, borderColor: BG,
+  },
   avatarImg: { width: '100%', height: '100%' },
   avatarFallback: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  avatarInitials: { fontSize: 40, fontWeight: '900', color: '#fff' },
-  verifiedBadge: { position: 'absolute', bottom: 4, right: 4, width: 26, height: 26, borderRadius: 13, backgroundColor: '#3498db', justifyContent: 'center', alignItems: 'center', borderWidth: 2.5, borderColor: BG },
-  body: { paddingTop: 62, paddingHorizontal: 20 },
-  name: { fontSize: 24, fontWeight: '900', color: TEXT, letterSpacing: -0.4, marginBottom: 6 },
-  bio: { fontSize: 14, color: TEXT2, lineHeight: 21, marginBottom: 20 },
-  statRow: { marginBottom: 18, borderRadius: 20 },
-  statRowContent: { flexDirection: 'row', alignItems: 'center', padding: 0 },
-  statDiv: { width: 1, height: 28, backgroundColor: BORDER },
+  avatarInitials: { fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
+  verifiedBadge: {
+    position: 'absolute', bottom: 2, right: 2,
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: '#3498db', justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: BG,
+  },
+
+  profileActions: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 4 },
+  bookBtn: { backgroundColor: ACCENT, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 8 },
+  bookBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  iconBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    borderWidth: 1, borderColor: BORDER,
+    justifyContent: 'center', alignItems: 'center',
+    backgroundColor: CARD,
+  },
+
+  body: { paddingHorizontal: 16 },
+
+  name: { fontSize: 20, fontWeight: '800', color: TEXT, letterSpacing: -0.3, marginBottom: 2 },
+  specialtyRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 },
+  specialty: { fontSize: 13, color: TEXT2, fontWeight: '500' },
+  bio: { fontSize: 14, color: TEXT2, lineHeight: 21, marginBottom: 12 },
+
+  infoRow: { flexDirection: 'row', gap: 16, marginBottom: 14 },
+  infoItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  infoText: { fontSize: 12, color: TEXT3, fontWeight: '500' },
+
+  followBtn: {
+    borderRadius: 20,
+    paddingHorizontal: 20, paddingVertical: 7,
+    borderWidth: 1, borderColor: BORDER, marginBottom: 20,
+  },
+  followingBtn: { backgroundColor: 'transparent' },
+  followBtnText: { fontSize: 14, fontWeight: '700', color: TEXT },
+  followingBtnText: { color: TEXT2 },
+
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: BORDER, marginVertical: 16 },
+
+  statsRow: { flexDirection: 'row', marginBottom: 4 },
   stat: { flex: 1, alignItems: 'center' },
-  statV: { fontSize: 19, fontWeight: '800', color: TEXT },
-  statL: { fontSize: 11, color: TEXT3, marginTop: 2, fontWeight: '600' },
-  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 18 },
-  tag: { backgroundColor: 'rgba(231,76,60,0.1)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(231,76,60,0.2)' },
-  tagText: { fontSize: 12, fontWeight: '700', color: ACCENT },
-  actions: { flexDirection: 'row', gap: 8, marginBottom: 18 },
-  followBtn: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: ACCENT, borderRadius: 16, paddingVertical: 14 },
-  followingBtn: { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
-  followBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  secBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD, borderRadius: 16, paddingVertical: 14, borderWidth: 1, borderColor: BORDER },
-  metaRow: { flexDirection: 'row', gap: 10, marginBottom: 26 },
-  metaCard: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 14, padding: 12 },
-  metaVal: { fontSize: 13, fontWeight: '700' },
-  gridLabel: { fontSize: 15, fontWeight: '800', color: TEXT, marginBottom: 10 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3 },
-  gridItem: { width: (SW - 46) / 3, height: (SW - 46) / 3, borderRadius: 8, overflow: 'hidden' },
+  statV: { fontSize: 17, fontWeight: '800', color: TEXT, marginBottom: 2 },
+  statL: { fontSize: 12, color: TEXT3, fontWeight: '500' },
+
+  section: { marginBottom: 4 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: TEXT },
+  writeReview: { fontSize: 13, fontWeight: '600', color: ACCENT },
+  emptyText: { fontSize: 14, color: TEXT3, marginBottom: 8 },
+
   sheet: { flex: 1, backgroundColor: '#111', paddingTop: 16 },
-  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: 18 },
-  sheetTitle: { fontSize: 20, fontWeight: '800', color: TEXT, paddingHorizontal: 20, marginBottom: 20 },
-  slotBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 14, backgroundColor: CARD, marginBottom: 8, borderWidth: 1, borderColor: 'transparent' },
-  slotBtnOn: { borderColor: ACCENT, backgroundColor: 'rgba(231,76,60,0.05)' },
-  slotDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: TEXT3 },
-  slotDotOn: { backgroundColor: ACCENT },
-  slotText: { flex: 1, fontSize: 14, color: TEXT2, fontWeight: '500' },
-  slotTextOn: { color: TEXT, fontWeight: '700' },
-  sheetInput: { backgroundColor: CARD, borderRadius: 14, padding: 16, color: TEXT, borderWidth: 1, borderColor: BORDER, fontSize: 15 },
-  sheetBtn: { marginTop: 24, borderRadius: 16, overflow: 'hidden' },
-  sheetBtnGrad: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
-  sheetBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  sectionLabel: { fontSize: 13, fontWeight: '700', color: TEXT3, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 10 },
-  dateRow: { flexDirection: 'row', gap: 6 },
-  dateBtn: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 12, backgroundColor: CARD, borderWidth: 1, borderColor: 'transparent' },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: 20 },
+  sheetTitle: { fontSize: 18, fontWeight: '800', color: TEXT, paddingHorizontal: 20, marginBottom: 24 },
+  sectionLabel: { fontSize: 11, fontWeight: '700', color: TEXT3, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 },
+
+  dateRow: { flexDirection: 'row', gap: 6, paddingBottom: 4 },
+  dateBtn: { width: 52, alignItems: 'center', paddingVertical: 10, borderRadius: 10, backgroundColor: CARD, borderWidth: 1, borderColor: 'transparent' },
   dateBtnOn: { borderColor: ACCENT, backgroundColor: 'rgba(231,76,60,0.08)' },
-  dateBtnDay: { fontSize: 11, color: TEXT3, fontWeight: '600', marginBottom: 4 },
+  dateBtnDay: { fontSize: 11, color: TEXT3, fontWeight: '600', marginBottom: 5 },
   dateBtnDayOn: { color: ACCENT },
-  dateBtnNum: { fontSize: 16, fontWeight: '800', color: TEXT2 },
+  dateBtnNum: { fontSize: 17, fontWeight: '800', color: TEXT2, marginBottom: 2 },
   dateBtnNumOn: { color: TEXT },
+  dateBtnMonth: { fontSize: 10, color: TEXT3, fontWeight: '500' },
+
+  slotBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 14, paddingHorizontal: 16,
+    borderRadius: 12, backgroundColor: CARD,
+    marginBottom: 6, borderWidth: 1, borderColor: 'transparent',
+  },
+  slotBtnOn: { borderColor: ACCENT, backgroundColor: 'rgba(231,76,60,0.05)' },
+  slotText: { fontSize: 14, color: TEXT2, fontWeight: '500' },
+  slotTextOn: { color: TEXT, fontWeight: '600' },
+
+  sheetInput: {
+    backgroundColor: CARD, borderRadius: 12, padding: 14,
+    color: TEXT, borderWidth: 1, borderColor: BORDER, fontSize: 14,
+  },
+  sheetBtn: { borderRadius: 14, overflow: 'hidden' },
+  sheetBtnGrad: { paddingVertical: 15, alignItems: 'center' },
+  sheetBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+
+  deleteReviewBtn: { marginTop: 16, alignItems: 'center', paddingVertical: 12 },
+  deleteReviewText: { fontSize: 14, color: TEXT3, fontWeight: '500' },
+});
+
+const p = StyleSheet.create({
+  card: { marginBottom: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER, paddingBottom: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  avatar: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden' },
+  avatarImg: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
+  avatarText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  authorName: { fontSize: 14, fontWeight: '700', color: TEXT, marginBottom: 1 },
+  timestamp: { fontSize: 11, color: TEXT3 },
+  caption: { fontSize: 14, color: TEXT, lineHeight: 20, marginBottom: 10 },
+  image: { width: '100%', height: SW * 0.65, borderRadius: 10, marginBottom: 10 },
+  actions: { flexDirection: 'row', gap: 16 },
+  action: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  actionText: { fontSize: 13, color: TEXT2, fontWeight: '500' },
+  comments: { marginTop: 10, gap: 6 },
+  comment: { flexDirection: 'row', gap: 6 },
+  commentName: { fontSize: 13, fontWeight: '700', color: TEXT },
+  commentText: { fontSize: 13, color: TEXT2, flex: 1 },
+});
+
+const rv = StyleSheet.create({
+  card: { marginBottom: 14, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
+  avatar: { width: 32, height: 32, borderRadius: 16, overflow: 'hidden' },
+  avatarImg: { width: '100%', height: '100%' },
+  avatarFallback: { width: '100%', height: '100%', backgroundColor: CARD, justifyContent: 'center', alignItems: 'center' },
+  avatarText: { fontSize: 13, fontWeight: '700', color: TEXT2 },
+  name: { fontSize: 13, fontWeight: '700', color: TEXT, marginBottom: 3 },
+  time: { fontSize: 11, color: TEXT3, marginRight: 6 },
+  comment: { fontSize: 13, color: TEXT2, lineHeight: 19 },
 });
