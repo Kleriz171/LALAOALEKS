@@ -1,0 +1,297 @@
+export const SPINE_BONES = [
+  {
+    name: 'Atlas (C1)',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'The first cervical vertebra, ring-shaped with no vertebral body. Named after the Greek Titan who held up the celestial sphere.',
+    function: 'Supports the skull, allows nodding motion (flexion/extension) of the head at the atlanto-occipital joint.',
+    importance: 'Critical for head movement. Fracture (Jefferson fracture) can be fatal.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.55, z: -0.04 },
+    exercises: [
+      { name: 'Chin Tucks', rank: 1, description: 'Strengthens deep neck flexors supporting C1.' },
+    ]
+  },
+  {
+    name: 'Axis (C2)',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'The second cervical vertebra with a tooth-like projection (dens/odontoid process) that projects upward into the atlas.',
+    function: 'Allows rotation of the head via the dens pivot. Approximately 50% of cervical rotation occurs at C1-C2.',
+    importance: 'Critical for head rotation. Dens fracture or dislocation can damage spinal cord.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.53, z: -0.04 },
+    exercises: []
+  },
+  {
+    name: 'C3 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Third cervical vertebra, typical cervical shape with bifid spinous process and transverse foramina for vertebral arteries.',
+    function: 'Provides mobility of the cervical spine, protects spinal cord, supports head weight.',
+    importance: 'Part of the mobile cervical segment. Houses nerve roots for the neck.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.51, z: -0.04 },
+    exercises: []
+  },
+  {
+    name: 'C4 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Fourth cervical vertebra with typical cervical features. C4 nerve root contributes to the phrenic nerve.',
+    function: 'Provides mobility, protects spinal cord. C4 nerve innervates the diaphragm via phrenic nerve.',
+    importance: 'Injury above C4 can cause respiratory paralysis due to phrenic nerve damage.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.49, z: -0.04 },
+    exercises: []
+  },
+  {
+    name: 'C5 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Fifth cervical vertebra. C5 nerve root supplies deltoid and biceps muscles.',
+    function: 'Provides mobility, protects spinal cord. C5 nerve enables shoulder abduction and elbow flexion.',
+    importance: 'C5 radiculopathy causes shoulder weakness and numbness.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.47, z: -0.04 },
+    exercises: []
+  },
+  {
+    name: 'C6 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Sixth cervical vertebra. Its anterior tubercle (carotid tubercle) is used to compress the carotid artery.',
+    function: 'Provides mobility, protects spinal cord. C6 nerve enables wrist extension.',
+    importance: 'C6 radiculopathy causes thumb numbness and wrist extensor weakness.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.45, z: -0.04 },
+    exercises: []
+  },
+  {
+    name: 'C7 Vertebra (Vertebra Prominens)',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Seventh and last cervical vertebra with a long, non-bifid spinous process easily palpable at the base of the neck.',
+    function: 'Transitional vertebra, provides attachment for ligamentum nuchae, landmark for counting vertebrae.',
+    importance: 'Important anatomical landmark. C7 nerve affects triceps and finger extension.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.43, z: -0.05 },
+    exercises: []
+  },
+  {
+    name: 'T1 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'First thoracic vertebra, transitional with cervical features. Articulates with the first rib.',
+    function: 'Supports first rib attachment, protects thoracic spinal cord, allows limited rotation.',
+    importance: 'T1 nerve contributes to brachial plexus affecting hand function.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.4, z: -0.06 },
+    exercises: []
+  },
+  {
+    name: 'T2 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Second thoracic vertebra with typical thoracic features including costal facets for rib articulation.',
+    function: 'Articulates with second rib, provides stability to thoracic cage.',
+    importance: 'Part of the stable thoracic segment protecting vital organs.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.37, z: -0.07 },
+    exercises: []
+  },
+  {
+    name: 'T3 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Third thoracic vertebra, typical thoracic morphology with heart-shaped body and long, inferiorly-angled spinous process.',
+    function: 'Articulates with third rib, provides spinal stability and protection.',
+    importance: 'Forms part of the protective thoracic cage.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.34, z: -0.07 },
+    exercises: []
+  },
+  {
+    name: 'T4 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Fourth thoracic vertebra at the level of the sternal angle. Important anatomical landmark.',
+    function: 'Articulates with fourth rib, provides reference point at sternal angle level.',
+    importance: 'T4 level marks the aortic arch and bifurcation of trachea.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.31, z: -0.07 },
+    exercises: []
+  },
+  {
+    name: 'T5 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Fifth thoracic vertebra, typical thoracic morphology.',
+    function: 'Articulates with fifth rib, maintains thoracic stability.',
+    importance: 'Part of the mid-thoracic region.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.28, z: -0.07 },
+    exercises: []
+  },
+  {
+    name: 'T6 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Sixth thoracic vertebra at approximately the level of the xiphoid process.',
+    function: 'Articulates with sixth rib, protects spinal cord.',
+    importance: 'Mid-thoracic stability region.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.25, z: -0.08 },
+    exercises: []
+  },
+  {
+    name: 'T7 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Seventh thoracic vertebra, typical thoracic features.',
+    function: 'Articulates with seventh (last true) rib, maintains spinal alignment.',
+    importance: 'Transition to false rib region below.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.22, z: -0.08 },
+    exercises: []
+  },
+  {
+    name: 'T8 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Eighth thoracic vertebra with costal facets for eighth rib (first false rib).',
+    function: 'Articulates with eighth rib, provides trunk stability.',
+    importance: 'Lower thoracic region with increasing mobility.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.19, z: -0.08 },
+    exercises: []
+  },
+  {
+    name: 'T9 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Ninth thoracic vertebra, may have single or double costal facets.',
+    function: 'Articulates with ninth rib, transitional mobility.',
+    importance: 'Increasing range of motion in lower thoracic spine.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.16, z: -0.08 },
+    exercises: []
+  },
+  {
+    name: 'T10 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Tenth thoracic vertebra with single costal facet on the pedicle.',
+    function: 'Articulates with tenth rib, provides mobility and stability.',
+    importance: 'Lower thoracic transitional region.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.13, z: -0.08 },
+    exercises: []
+  },
+  {
+    name: 'T11 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Eleventh thoracic vertebra, articulates with floating rib. Features more lumbar-like characteristics.',
+    function: 'Articulates with eleventh rib (floating), transitional to lumbar region.',
+    importance: 'Increasing mobility, common site for thoracolumbar injuries.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.1, z: -0.08 },
+    exercises: []
+  },
+  {
+    name: 'T12 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Twelfth and last thoracic vertebra, transitional with lumbar features. Articulates with twelfth floating rib.',
+    function: 'Transitional vertebra between thoracic and lumbar regions, significant mobility.',
+    importance: 'Common fracture site. Thoracolumbar junction is vulnerable to trauma.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.07, z: -0.08 },
+    exercises: [
+      { name: 'Thoracic Extension', rank: 1, description: 'Improves mobility at thoracolumbar junction.' },
+    ]
+  },
+  {
+    name: 'L1 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'First lumbar vertebra, large kidney-shaped body without costal facets. Spinal cord typically ends at L1-L2 level.',
+    function: 'Bears significant body weight, allows flexion/extension, protects conus medullaris.',
+    importance: 'Spinal cord ends here. Lumbar puncture performed below this level.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 1.02, z: -0.08 },
+    exercises: []
+  },
+  {
+    name: 'L2 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Second lumbar vertebra with typical lumbar features. Below the conus medullaris, only cauda equina present.',
+    function: 'Bears body weight, provides significant flexion/extension range.',
+    importance: 'Safe level for lumbar puncture as spinal cord has ended.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 0.98, z: -0.08 },
+    exercises: []
+  },
+  {
+    name: 'L3 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Third lumbar vertebra at the level of the umbilicus. Largest transverse processes.',
+    function: 'Primary weight-bearing, attachment for psoas major muscle.',
+    importance: 'Central lumbar vertebra, common site for disc herniation.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 0.94, z: -0.08 },
+    exercises: []
+  },
+  {
+    name: 'L4 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Fourth lumbar vertebra at the level of the iliac crest. Common site for pathology.',
+    function: 'Major weight-bearing, significant mobility in all planes.',
+    importance: 'L4-L5 disc is most commonly herniated. L4 nerve affects knee extension.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 0.9, z: -0.08 },
+    exercises: []
+  },
+  {
+    name: 'L5 Vertebra',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Fifth and largest lumbar vertebra. Wedge-shaped with large transverse processes. Articulates with sacrum.',
+    function: 'Bears most body weight, forms lumbosacral junction, significant flexion/extension.',
+    importance: 'Most stressed vertebra. L5-S1 disc commonly affected. Spondylolisthesis common here.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 0.86, z: -0.08 },
+    exercises: [
+      { name: 'Core Stability', rank: 1, description: 'Protects the lumbosacral junction.' },
+      { name: 'Hip Hinge Pattern', rank: 2, description: 'Reduces stress on L5.' },
+    ]
+  },
+  {
+    name: 'Sacrum',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Large triangular bone formed by fusion of 5 sacral vertebrae (S1-S5). Forms the posterior pelvis and articulates with the ilia.',
+    function: 'Transmits body weight to pelvis, forms sacroiliac joints, provides attachment for muscles and ligaments.',
+    importance: 'Keystone of the pelvis. Sacroiliac dysfunction is a common cause of lower back pain.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 0.78, z: -0.1 },
+    exercises: [
+      { name: 'SI Joint Mobilization', rank: 1, description: 'Maintains sacroiliac joint health.' },
+    ]
+  },
+  {
+    name: 'Coccyx (Tailbone)',
+    type: 'bone',
+    category: 'skeletal',
+    description: 'Small triangular bone formed by fusion of 3-5 coccygeal vertebrae. Vestigial tail in humans.',
+    function: 'Attachment point for pelvic floor muscles and gluteus maximus, weight-bearing when seated.',
+    importance: 'Coccydynia (tailbone pain) can result from falls or prolonged sitting. Supports pelvic floor.',
+    modelLayer: 'skeleton_organs',
+    position3D: { x: 0, y: 0.72, z: -0.11 },
+    exercises: []
+  },
+];
